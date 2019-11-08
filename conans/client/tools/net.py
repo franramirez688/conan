@@ -8,14 +8,15 @@ from conans.util.fallbacks import default_output, default_requester
 
 def get(url, md5='', sha1='', sha256='', destination=".", filename="", keep_permissions=False,
         pattern=None, requester=None, output=None, verify=True, retry=None, retry_wait=None,
-        overwrite=False, auth=None, headers=None):
+        overwrite=False, auth=None, headers=None, checksum=""):
     """ high level downloader + unzipper + (optional hash checker) + delete temporary zip
     """
+    # FIXME: checksum mandatory or not?
     if not filename and ("?" in url or "=" in url):
         raise ConanException("Cannot deduce file name form url. Use 'filename' parameter.")
 
     filename = filename or os.path.basename(url)
-    download(url, filename, out=output, requester=requester, verify=verify, retry=retry,
+    download(url, filename, checksum, out=output, requester=requester, verify=verify, retry=retry,
              retry_wait=retry_wait, overwrite=overwrite, auth=auth, headers=headers)
 
     if md5:
@@ -53,8 +54,8 @@ def ftp_download(ip, filename, login='', password=''):
             pass
 
 
-def download(url, filename, verify=True, out=None, retry=None, retry_wait=None, overwrite=False,
-             auth=None, headers=None, requester=None):
+def download(url, filename, checksum, verify=True, out=None, retry=None, retry_wait=None,
+             overwrite=False, auth=None, headers=None, requester=None):
 
     out = default_output(out, 'conans.client.tools.net.download')
     requester = default_requester(requester, 'conans.client.tools.net.download')
@@ -65,6 +66,8 @@ def download(url, filename, verify=True, out=None, retry=None, retry_wait=None, 
     retry_wait = retry_wait if retry_wait is not None else getattr(requester, "retry_wait", None)
     retry_wait = retry_wait if retry_wait is not None else 5
 
+    # FIXME: checksum is the subdir, where will it be checked?
+    # FIXME: CONAN_CACHE_PATH?
     downloader = FileDownloader(requester=requester, output=out, verify=verify)
     downloader.download(url, filename, retry=retry, retry_wait=retry_wait, overwrite=overwrite,
                         auth=auth, headers=headers)

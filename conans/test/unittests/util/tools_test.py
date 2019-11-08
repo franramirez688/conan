@@ -713,19 +713,22 @@ ProgramFiles(x86)=C:\Program Files (x86)
         http_server.run_server()
 
         out = TestBufferConanOutput()
+        checksum = md5("https://dl.bintray.com/conan/installers/conan-ubuntu-64_1_20_2.deb")
 
         # Connection error
         # Default behaviour
         with six.assertRaisesRegex(self, ConanException, "Error downloading"):
             tools.download("http://fakeurl3.es/nonexists",
-                           os.path.join(temp_folder(), "file.txt"), out=out,
+                           os.path.join(temp_folder(), "file.txt"),
+                           checksum, out=out,
                            requester=requests)
         self.assertEqual(str(out).count("Waiting 5 seconds to retry..."), 1)
 
         # Retry arguments override defaults
         with six.assertRaisesRegex(self, ConanException, "Error downloading"):
             tools.download("http://fakeurl3.es/nonexists",
-                           os.path.join(temp_folder(), "file.txt"), out=out,
+                           os.path.join(temp_folder(), "file.txt"),
+                           checksum, out=out,
                            requester=requests,
                            retry=2, retry_wait=1)
         self.assertEqual(str(out).count("Waiting 1 seconds to retry..."), 2)
@@ -740,31 +743,36 @@ ProgramFiles(x86)=C:\Program Files (x86)
 
         with six.assertRaisesRegex(self, ConanException, "Error downloading"):
             tools.download("http://fakeurl3.es/nonexists",
-                           os.path.join(temp_folder(), "file.txt"), out=out,
+                           os.path.join(temp_folder(), "file.txt"),
+                           checksum, out=out,
                            requester=MockRequester())
         self.assertEqual(str(out).count("Waiting 0 seconds to retry..."), 2)
 
         # Not found error
         with six.assertRaisesRegex(self, NotFoundException, "Not found: "):
             tools.download("http://google.es/FILE_NOT_FOUND",
-                           os.path.join(temp_folder(), "README.txt"), out=out,
+                           os.path.join(temp_folder(), "README.txt"),
+                           checksum, out=out,
                            requester=requests,
                            retry=2, retry_wait=0)
 
         # And OK
         dest = os.path.join(temp_folder(), "manual.html")
-        tools.download("http://localhost:%s/manual.html" % http_server.port, dest, out=out, retry=3,
+        tools.download("http://localhost:%s/manual.html" % http_server.port, dest,
+                       checksum, out=out, retry=3,
                        retry_wait=0, requester=requests)
         self.assertTrue(os.path.exists(dest))
         content = load(dest)
 
         # overwrite = False
         with self.assertRaises(ConanException):
-            tools.download("http://localhost:%s/manual.html" % http_server.port, dest, out=out,
+            tools.download("http://localhost:%s/manual.html" % http_server.port, dest,
+                           checksum, out=out,
                            retry=2, retry_wait=0, overwrite=False, requester=requests)
 
         # overwrite = True
-        tools.download("http://localhost:%s/manual.html" % http_server.port, dest, out=out, retry=2,
+        tools.download("http://localhost:%s/manual.html" % http_server.port, dest,
+                       checksum, out=out, retry=2,
                        retry_wait=0, overwrite=True, requester=requests)
         self.assertTrue(os.path.exists(dest))
         content_new = load(dest)
@@ -773,17 +781,62 @@ ProgramFiles(x86)=C:\Program Files (x86)
         # Not authorized
         with self.assertRaises(ConanException):
             tools.download("http://localhost:%s/basic-auth/user/passwd" % http_server.port, dest,
-                           overwrite=True, requester=requests, out=out)
+                           checksum, overwrite=True, requester=requests, out=out)
 
         # Authorized
         tools.download("http://localhost:%s/basic-auth/user/passwd" % http_server.port, dest,
-                       auth=("user", "passwd"), overwrite=True, requester=requests, out=out)
+                       checksum, auth=("user", "passwd"), overwrite=True,
+                       requester=requests, out=out)
 
         # Authorized using headers
         tools.download("http://localhost:%s/basic-auth/user/passwd" % http_server.port, dest,
-                       headers={"Authorization": "Basic dXNlcjpwYXNzd2Q="}, overwrite=True,
-                       requester=requests, out=out)
+                       checksum, headers={"Authorization": "Basic dXNlcjpwYXNzd2Q="},
+                       overwrite=True, requester=requests, out=out)
+
         http_server.stop()
+
+    @attr("slow")
+    def download_smart_cache_test(self):
+        http_server = StoppableThreadBottle()
+        f_name = "cached_file.html"
+        with tools.chdir(tools.mkdir_tmp()):
+            with open(f_name, "w") as fmanual:
+                fmanual.write("this is some content")
+                manual_file = os.path.abspath(f_name)
+
+        from bottle import auth_basic
+
+        @http_server.server.get("/%s" % f_name)
+        def get_manual():
+            return static_file(os.path.basename(manual_file),
+                               os.path.dirname(manual_file))
+
+        def check_auth(user, password):
+            # Check user/password here
+            return user == "user" and password == "passwd"
+
+        @http_server.server.get('/basic-auth/<user>/<password>')
+        @auth_basic(check_auth)
+        def get_manual_auth(user, password):
+            return static_file(os.path.basename(manual_file),
+                               os.path.dirname(manual_file))
+
+        # Fake subdirectory name where download will be cached (if it does not exist)
+        checksum = md5("https://dl.bintray.com/conan/installers/conan-ubuntu-64_1_20_2.deb")
+        out = TestBufferConanOutput()
+
+        # Authorized
+        tools.download("http://localhost:%s/basic-auth/user/passwd" % http_server.port, f_name,
+                       checksum, auth=("user", "passwd"), overwrite=True,
+                       requester=requests, out=out)
+        # Conan cache path
+        # FIXME: define the CONAN_CACHE_PATH
+        cache_path = get_env("CONAN_CACHE_PATH", default='/tmp/conan_cache')
+
+        cached_subdir = os.path.join(cache_path, checksum, f_name)
+        self.assertTrue(os.path.exists(cached_subdir))
+
+        http_server.run_server()
 
     @parameterized.expand([
         ["Linux", "x86", None, "x86-linux-gnu"],

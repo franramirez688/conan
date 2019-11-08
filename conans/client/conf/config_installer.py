@@ -122,8 +122,8 @@ def _process_download(config, cache, output, requester):
         output.info("Trying to download  %s" % _hide_password(config.uri))
         zippath = os.path.join(tmp_folder, "config.zip")
         try:
-            tools.download(config.uri, zippath, out=output, verify=config.verify_ssl,
-                           requester=requester)
+            tools.download(config.uri, zippath, checksum, out=output,
+                           verify=config.verify_ssl, requester=requester)
             _process_zip_file(config, zippath, cache, output, tmp_folder, remove=True)
         except Exception as e:
             raise ConanException("Error while installing config from %s\n%s" % (config.uri, str(e)))
