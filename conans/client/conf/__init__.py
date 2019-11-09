@@ -119,6 +119,8 @@ default_package_id_mode = semver_direct_mode # environment CONAN_DEFAULT_PACKAGE
 # read_only_cache = True              # environment CONAN_READ_ONLY_CACHE
 # pylintrc = path/to/pylintrc_file    # environment CONAN_PYLINTRC
 # cache_no_locks = True               # environment CONAN_CACHE_NO_LOCKS
+# cache_downloads_path = path/to/cache_downloads_folder         # environment CONAN_CACHE_DOWNLOADS_PATH
+# cache_downloads_enabled = True      # environment CONAN_CACHE_DOWNLOADS_ENABLED
 # user_home_short = your_path         # environment CONAN_USER_HOME_SHORT
 # use_always_short_paths = False      # environment CONAN_USE_ALWAYS_SHORT_PATHS
 # skip_vs_projects_upgrade = False    # environment CONAN_SKIP_VS_PROJECTS_UPGRADE
@@ -200,6 +202,8 @@ class ConanClientConfigParser(ConfigParser, object):
                "CONAN_SKIP_BROKEN_SYMLINKS_CHECK": self._env_c("general.skip_broken_symlinks_check", "CONAN_SKIP_BROKEN_SYMLINKS_CHECK", "False"),
                "CONAN_PYLINTRC": self._env_c("general.pylintrc", "CONAN_PYLINTRC", None),
                "CONAN_CACHE_NO_LOCKS": self._env_c("general.cache_no_locks", "CONAN_CACHE_NO_LOCKS", "False"),
+               "CONAN_CACHE_DOWNLOADS_PATH": self._env_c("general.cache_downloads_path", "CONAN_CACHE_DOWNLOADS_PATH", None),
+               "CONAN_CACHE_DOWNLOADS_ENABLED": self._env_c("general.cache_downloads_enabled", "CONAN_CACHE_DOWNLOADS_ENABLED", "True"),
                "CONAN_PYLINT_WERR": self._env_c("general.pylint_werr", "CONAN_PYLINT_WERR", None),
                "CONAN_SYSREQUIRES_SUDO": self._env_c("general.sysrequires_sudo", "CONAN_SYSREQUIRES_SUDO", "False"),
                "CONAN_SYSREQUIRES_MODE": self._env_c("general.sysrequires_mode", "CONAN_SYSREQUIRES_MODE", "enabled"),
