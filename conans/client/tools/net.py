@@ -58,14 +58,18 @@ def ftp_download(ip, filename, login='', password=''):
             pass
 
 
+# FIXME: Move to proper module. Perhaps, client.cache.cache one?
 def _get_cached_download_folder(url, filename):
-    """Get a MD5 hash code
+    """Get the cached downloads folder
 
     :param url: `str` any URL
     :param filename: `str` any file name
-    :return: MD5 hash code
+    :return: `str` cached folder path
     """
-    return md5(url + filename)
+    # Hashing cached subfolder to avoid name clashes
+    hashed_subfolder = md5(url + filename)
+    return os.path.join(get_env("CONAN_CACHE_DOWNLOADS_PATH"),  # FIXME: default value?
+                        hashed_subfolder)
 
 
 def _copy_cached_download_to_source(cached_file_path, checksum):
@@ -99,21 +103,22 @@ def download(url, filename, checksum, verify=True, out=None, retry=None, retry_w
     retry_wait = retry_wait if retry_wait is not None else 5
 
     # Check if downloads cache is enabled or not
-    cache_download_is_enabled = get_env("CONAN_DOWNLOADS_CACHE_ENABLED")
+    cache_download_is_enabled = get_env("CONAN_CACHE_DOWNLOADS_ENABLED")
     if cache_download_is_enabled:
-        cached_folder_path = os.path.join(get_env("CONAN_DOWNLOADS_CACHE_PATH"),
-                                          _get_cached_download_folder(url, filename))
+        cached_folder_path = _get_cached_download_folder(url, filename)
         cached_file_path = os.path.join(cached_folder_path, filename)
         # Have a look at local cache downloads folder
         if os.path.exists(cached_file_path):
+            # Offline work
             _copy_cached_download_to_source(cached_file_path, checksum)
-        else:  # Else download and save in cache folder
+        else:
+            # Download and save it in cache folder
             downloader = FileDownloader(requester=requester, output=out, verify=verify)
             downloader.download(url, filename, retry=retry, retry_wait=retry_wait,
                                 overwrite=overwrite,
                                 auth=auth, headers=headers)
-            # Create the cache folder
-            os.makedirs(cached_folder_path)
+            # Create the cache folder. It does not care if it exists (maybe with concurrent jobs)
+            os.makedirs(cached_folder_path, exist_ok=True)
             # Copy to filename to cache folder
             shutil.copytree(filename, cached_file_path, symlinks=True)
     else:

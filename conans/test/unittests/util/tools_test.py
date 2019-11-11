@@ -830,8 +830,8 @@ ProgramFiles(x86)=C:\Program Files (x86)
                        checksum, auth=("user", "passwd"), overwrite=True,
                        requester=requests, out=out)
         # Conan cache path
-        # FIXME: define the CONAN_CACHE_PATH
-        cache_path = get_env("CONAN_CACHE_PATH", default='/tmp/conan_cache')
+        # FIXME: define the CONAN_CACHE_DOWNLOADS_PATH
+        cache_path = get_env("CONAN_CACHE_DOWNLOADS_PATH", default='/tmp/conan_cache')
 
         cached_subdir = os.path.join(cache_path, checksum, f_name)
         self.assertTrue(os.path.exists(cached_subdir))
