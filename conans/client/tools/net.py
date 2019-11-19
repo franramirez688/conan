@@ -1,9 +1,13 @@
+import hashlib
 import os
 
 from conans.client.rest.uploader_downloader import FileDownloader
 from conans.client.tools.files import check_md5, check_sha1, check_sha256, unzip
 from conans.errors import ConanException
 from conans.util.fallbacks import default_output, default_requester
+
+
+DOWNLOADS_CACHE_FOLDER = os.path.join(os.path.expanduser('~'), 'conan_downloads_cache')
 
 
 def get(url, md5='', sha1='', sha256='', destination=".", filename="", keep_permissions=False,
@@ -69,3 +73,12 @@ def download(url, filename, verify=True, out=None, retry=None, retry_wait=None, 
     downloader.download(url, filename, retry=retry, retry_wait=retry_wait, overwrite=overwrite,
                         auth=auth, headers=headers)
     out.writeln("")
+
+
+def cache_download(url, filename, *args, **kwargs):
+    base_file_name = os.path.basename(filename)
+    name_to_be_hashed = b"%s%s" % (url, base_file_name)
+    hashed_cache_subfolder = hashlib.md5(name_to_be_hashed).hexdigest()
+    cache_folder = os.path.join(DOWNLOADS_CACHE_FOLDER, hashed_cache_subfolder)
+    if os.path.exists(cache_folder):
+        pass
