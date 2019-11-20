@@ -1,5 +1,6 @@
 import hashlib
 import os
+import shutil
 
 from conans.client.rest.uploader_downloader import FileDownloader
 from conans.client.tools.files import check_md5, check_sha1, check_sha256, unzip
@@ -75,10 +76,25 @@ def download(url, filename, verify=True, out=None, retry=None, retry_wait=None, 
     out.writeln("")
 
 
-def cache_download(url, filename, *args, **kwargs):
-    base_file_name = os.path.basename(filename)
-    name_to_be_hashed = b"%s%s" % (url, base_file_name)
+def get_cache_folders_info(url, filename) -> (str, str):
+    """Get the cache folder and cached file path"""
+    file_dir, base_file_name = os.path.split(filename)
+    # Hashed cache subfolder with MD5 algorithm
+    name_to_be_hashed = ("%s%s" % (url, base_file_name)).encode()
     hashed_cache_subfolder = hashlib.md5(name_to_be_hashed).hexdigest()
+    # Get cache folder and final cached file path
     cache_folder = os.path.join(DOWNLOADS_CACHE_FOLDER, hashed_cache_subfolder)
-    if os.path.exists(cache_folder):
-        pass
+    cached_file_path = os.path.join(cache_folder, base_file_name)
+    return cache_folder, cached_file_path
+
+
+def cache_download(url, filename, *args, **kwargs):
+    """Cache any download to avoid repeating the same process"""
+    cache_folder_path, cached_file_path = get_cache_folders_info(url, filename)
+    # Check if file already exists in the cache
+    if os.path.exists(cached_file_path):
+        shutil.copyfile(cached_file_path, filename)
+    else:  # if not, creates the cache folder and copy the file
+        os.makedirs(cache_folder_path, exist_ok=True)
+        download(url, filename, *args, **kwargs)
+        shutil.copyfile(filename, cached_file_path)
