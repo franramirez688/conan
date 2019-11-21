@@ -9,14 +9,14 @@ from conans.test.utils.tools import TestBufferConanOutput
 
 try:
     from unittest.mock import MagicMock, patch
-except:
+except ImportError:
     from mock import MagicMock, patch
 
 from conans.client.tools import net
 from conans.test.utils.test_files import temp_folder
 
 
-class FakeDownloader(MagicMock):
+class FileDownloaderMock(MagicMock):
 
     def download(self, url, file_path, **kwargs):
         """Create a fake file"""
@@ -40,7 +40,7 @@ class CacheDownloadTest(unittest.TestCase):
         shutil.rmtree(self._cwd)
         shutil.rmtree(self._cache_dir)
 
-    @patch('conans.client.tools.net.FileDownloader', new_callable=FakeDownloader)
+    @patch('conans.client.tools.net.FileDownloader', new_callable=FileDownloaderMock)
     def test_file_is_downloaded_the_first_time(self, file_downloader_mock):
         """Tests file will be downloaded if it does not exist in cache"""
         self.assertFalse(os.path.exists(self._cached_file_path))
@@ -49,7 +49,7 @@ class CacheDownloadTest(unittest.TestCase):
         file_downloader_mock.assert_called_once()
         self.assertTrue(os.path.exists(self._cached_file_path))
 
-    @patch('conans.client.tools.net.FileDownloader', new_callable=FakeDownloader)
+    @patch('conans.client.tools.net.FileDownloader', new_callable=FileDownloaderMock)
     def test_file_is_not_downloaded_if_exists_in_cache(self, file_downloader_mock):
         """Tests file will not downloaded if it already exists in cache"""
         os.makedirs(self._cache_folder)
@@ -61,23 +61,23 @@ class CacheDownloadTest(unittest.TestCase):
         file_downloader_mock.assert_not_called()
         self.assertTrue(os.path.exists(self._file_path))
 
-    @patch('conans.client.tools.net.FileDownloader', new_callable=FakeDownloader)
+    @patch('conans.client.tools.net.FileDownloader', new_callable=FileDownloaderMock)
     def test_cache_download_with_concurrent_processes(self, file_downloader_mock):
         """Tests if concurrent processes work as expected if they're
         working at the same time"""
 
         def _download_1():
-            net.cache_download('https://github.com/conan-io/conan/archive/1.20.4.zip', 'conan.zip',
+            net.cache_download(self._url, self._file_path,
                                out=self._out, requester=requests)
 
-        def _downoad_2():
-            net.cache_download('https://github.com/conan-io/conan/archive/1.20.4.zip', 'conan.zip',
+        def _download_2():
+            net.cache_download(self._url, self._file_path,
                                out=self._out, requester=requests)
 
         p1 = Process(target=_download_1)
         p1.start()
-        p2 = Process(target=_downoad_2)
+        p2 = Process(target=_download_2)
         p2.start()
         p1.join()
         p2.join()
-
+        file_downloader_mock.assert_called_once()
