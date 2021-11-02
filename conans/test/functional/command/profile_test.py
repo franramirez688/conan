@@ -184,22 +184,6 @@ class ProfileTest(unittest.TestCase):
         client.run("profile remove conf.MyConf ./MyProfile", assert_error=True)
         self.assertIn("Profile key 'conf.MyConf' doesn't exist", client.out)
 
-    @pytest.mark.xfail(reason="environment cannot be updated via command")
-    def test_profile_update_env(self):
-        client = TestClient()
-        client.run("profile new ./MyProfile")
-        pr_path = os.path.join(client.current_folder, "MyProfile")
-
-        client.run("profile update env.foo=bar ./MyProfile")
-        self.assertEqual(["[env]", "foo=bar"], load(pr_path).splitlines()[-2:])
-        client.run("profile update env.foo=BAZ ./MyProfile")
-        self.assertEqual(["[env]", "foo=BAZ"], load(pr_path).splitlines()[-2:])
-        client.run("profile update env.MyPkg:foo=FOO ./MyProfile")
-        self.assertEqual(["[env]", "foo=BAZ", "MyPkg:foo=FOO"], load(pr_path).splitlines()[-3:])
-        client.run("profile update env.MyPkg:foo=FOO,BAZ,BAR ./MyProfile")
-        self.assertEqual(["[env]", "foo=BAZ", "MyPkg:foo=FOO,BAZ,BAR"],
-                         load(pr_path).splitlines()[-3:])
-
     def test_profile_new(self):
         client = TestClient()
         client.run("profile new ./MyProfile")
