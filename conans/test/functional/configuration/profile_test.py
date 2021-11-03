@@ -3,12 +3,12 @@ import platform
 import textwrap
 import unittest
 from collections import OrderedDict
+from glob import glob
 from textwrap import dedent
 
 import pytest
 from parameterized import parameterized
 
-from conans.cli.output import ConanOutput
 from conans.client import tools
 from conans.paths import CONANFILE
 from conans.test.assets.genconanfile import GenConanfile
@@ -34,9 +34,9 @@ class AConan(ConanFile):
 """
 
 
-def create_profile(folder, name, settings=None, package_settings=None, env=None,
-                   package_env=None, options=None):
-    _create_profile(folder, name, settings, package_settings, env, package_env, options)
+def create_profile(folder, name, settings=None, package_settings=None, options=None, buildenv=None):
+    _create_profile(folder, name, settings=settings, package_settings=package_settings,
+                    options=options, buildenv=buildenv)
     content = load(os.path.join(folder, name))
     content = "include(default)\n    \n" + content
     save(os.path.join(folder, name), content)
@@ -47,23 +47,20 @@ class ProfileTest(unittest.TestCase):
     def setUp(self):
         self.client = TestClient()
 
-    @pytest.mark.xfail(reason="New environment changed")
+    @property
+    def conanbuildenv_file(self):
+        return glob(os.path.join(self.client.current_folder, "conanbuildenv*"))[0]
+
     def test_profile_conanfile_txt(self):
         """
-        Test prepended env variables are applied correctrly from a profile
+        Test prepended env variables are applied correctly from a profile
         """
         self.client.save({"conanfile.txt": ""})
         create_profile(self.client.cache.profiles_path, "envs", settings={},
-                       env=[("A_VAR", "A_VALUE"), ("PREPEND_VAR", ["new_path", "other_path"])],
-                       package_env={"Hello0": [("OTHER_VAR", "2")]})
-        self.client.run("install . -pr envs -g virtualenv")
-        content = self.client.load("environment.sh.env")
-        self.assertIn(":".join(["PREPEND_VAR=\"new_path\"", "\"other_path\""]) +
-                      "${PREPEND_VAR:+:$PREPEND_VAR}", content)
-        if platform.system() == "Windows":
-            content = self.client.load("environment.bat.env")
-            self.assertIn(";".join(["PREPEND_VAR=new_path", "other_path", "%PREPEND_VAR%"]),
-                          content)
+                       buildenv=["A_VAR=A_VALUE", "PREPEND_VAR=new_path", "PREPEND_VAR=+other_path"])
+        self.client.run("install . -pr envs -g VirtualBuildEnv")
+        content = self.client.load(self.conanbuildenv_file)
+        self.assertIn('PREPEND_VAR="other_path new_path"', content)
 
     def test_profile_relative_cwd(self):
         self.client.save({"conanfile.txt": "", "sub/sub/profile": ""})
@@ -80,7 +77,6 @@ class ProfileTest(unittest.TestCase):
                           "myprofile": "include(default)\n[settings]\nbuild_type=Debug"})
         self.client.run("create . conan/testing --profile myprofile")
 
-    @pytest.mark.xfail(reason="New environment changed")
     def test_bad_syntax(self):
         self.client.save({CONANFILE: conanfile_scope_env})
         self.client.run("export . lasote/stable")
@@ -116,13 +112,13 @@ class ProfileTest(unittest.TestCase):
                       self.client.out)
 
         profile = '''
-        [env]
+        [buildenv]
         as
         '''
         save(clang_profile_path, profile)
         self.client.run("install Hello0/0.1@lasote/stable --build missing -pr clang",
                         assert_error=True)
-        self.assertIn("Error reading 'clang' profile: Invalid env line 'as'",
+        self.assertIn("Error reading 'clang' profile: Bad env definition: as",
                       self.client.out)
 
         profile = '''
@@ -137,8 +133,8 @@ class ProfileTest(unittest.TestCase):
 
         profile = '''
         include(default)
-        [env]
-        ENV_VAR =   a value
+        [buildenv]
+        ENV_VAR=a value
         '''
         save(clang_profile_path, profile)
         self.client.run("install Hello0/0.1@lasote/stable --build missing -pr clang")
@@ -147,9 +143,9 @@ class ProfileTest(unittest.TestCase):
         profile = '''
         include(default)
         # Line with comments is not a problem
-        [env]
+        [buildenv]
         # Not even here
-        ENV_VAR =   a value
+        ENV_VAR=a value
         '''
         save(clang_profile_path, profile)
         self.client.run("install Hello0/0.1@lasote/stable --build -pr clang")
@@ -166,12 +162,11 @@ class ProfileTest(unittest.TestCase):
         self.assertIn("ERROR: Profile not found:", self.client.out)
         self.assertIn("scopes_env", self.client.out)
 
-    @pytest.mark.xfail(reason="New environment changed")
     def test_install_profile_env(self):
         create_profile(self.client.cache.profiles_path, "envs", settings={},
-                       env=[("A_VAR", "A_VALUE"),
-                            ("PREPEND_VAR", ["new_path", "other_path"])],
-                       package_env={"Hello0": [("OTHER_VAR", "2")]})
+                       buildenv=["A_VAR=A_VALUE", "PREPEND_VAR=new_path",
+                                 "PREPEND_VAR=+other_path",
+                                 "Hello0:OTHER_VAR=2"])
 
         self.client.save({"conanfile.py": conanfile_scope_env})
         self.client.run("export . lasote/stable")
