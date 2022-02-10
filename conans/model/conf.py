@@ -146,6 +146,7 @@ class Conf:
 
     def __getitem__(self, name):
         """
+        DEPRECATED: it's going to disappear in Conan 2.0. Use self.get() instead.
         To keep the backward compatibility:
 
         * if `values == []` returning `None`
@@ -159,10 +160,16 @@ class Conf:
         return values or None
 
     def __setitem__(self, name, value):
+        """
+        DEPRECATED: it's going to disappear in Conan 2.0.
+        """
         # FIXME: Keeping backward compatibility
         self.define(name, value)  # it's like a new definition
 
     def __delitem__(self, name):
+        """
+        DEPRECATED: it's going to disappear in Conan 2.0.
+        """
         # FIXME: Keeping backward compatibility
         del self._values[name]
 
@@ -183,6 +190,29 @@ class Conf:
     def sha(self):
         # FIXME: Keeping backward compatibility
         return self.dumps()
+
+    def get(self, conf_name, conf_type=None, default=None):
+        """
+        Get all the values belonging to the passed conf name. By default, those values
+        will be returned as a list-like object.
+        """
+        v = self._values.get(conf_name)
+        if v is not None:
+            if conf_type is not None:
+                try:
+                    v = conf_type(v)
+                except Exception:
+                    raise ConanException(f"Conf '{conf_name}' value '{v}' "
+                                         f"must be '{conf_type.__name__}'")
+        else:
+            v = default
+        return v
+
+    def pop(self, conf_name, default=None):
+        """
+        Remove any key-value given the conf name
+        """
+        return self._values.pop(conf_name, default=default)
 
     @staticmethod
     def _validate_lower_case(name):
@@ -260,16 +290,34 @@ class ConfDefinition:
     __nonzero__ = __bool__
 
     def __getitem__(self, module_name):
-        """ if a module name is requested for this, it goes to the None-Global config by default
+        """
+        DEPRECATED: it's going to disappear in Conan 2.0. Use self.get() instead.
+        if a module name is requested for this, it goes to the None-Global config by default
         """
         pattern, name = self._split_pattern_name(module_name)
         return self._pattern_confs.get(pattern, Conf())[name]
 
     def __delitem__(self, module_name):
-        """ if a module name is requested for this, it goes to the None-Global config by default
+        """
+        DEPRECATED: it's going to disappear in Conan 2.0.  Use self.pop() instead.
+        if a module name is requested for this, it goes to the None-Global config by default
         """
         pattern, name = self._split_pattern_name(module_name)
         del self._pattern_confs.get(pattern, Conf())[name]
+
+    def get(self, conf_name, conf_type=None, default=None):
+        """
+        Get the value of the  conf name requested and convert it to the [type]-like passed.
+        """
+        pattern, name = self._split_pattern_name(conf_name)
+        return self._pattern_confs.get(pattern, Conf()).get(name, conf_type, default)
+
+    def pop(self, conf_name, default=None):
+        """
+        Remove the conf name passed.
+        """
+        pattern, name = self._split_pattern_name(conf_name)
+        return self._pattern_confs.pop(pattern, Conf()).get(name, default)
 
     @staticmethod
     def _split_pattern_name(pattern_name):
