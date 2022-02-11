@@ -64,6 +64,10 @@ class _ConfValue:
     def __repr__(self):
         return "ConfValues: " + self.get_str()
 
+    @property
+    def values(self):
+        return self._values
+
     def dumps(self):
         result = []
         path = "(path)" if self._path else ""
@@ -198,6 +202,7 @@ class Conf:
         """
         v = self._values.get(conf_name)
         if v is not None:
+            v = v.values
             if conf_type is not None:
                 try:
                     v = conf_type(v)
