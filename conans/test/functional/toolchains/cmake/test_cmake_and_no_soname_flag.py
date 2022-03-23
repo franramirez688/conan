@@ -70,8 +70,6 @@ def test_no_soname_flag(nosoname):
 
         def package_info(self):
             self.cpp_info.libs = ["{name}"]
-            if {nosoname}:
-                self.cpp_info.set_property('nosoname', True)
 
     """)
     cmakelists_nosoname = textwrap.dedent("""
@@ -149,18 +147,36 @@ def test_no_soname_flag(nosoname):
         target_link_libraries(example lib_b::lib_b)
     """)
     conanfile = textwrap.dedent("""
-        [requires]
-        lib_b/1.0@lasote/stable
+    from conans import ConanFile
+    from conan.tools.cmake import CMakeToolchain
+    from conan.tools.build import PatchELF
 
-        [generators]
-        CMakeDeps
-        CMakeToolchain
-        VirtualRunEnv
+    class {name}Conan(ConanFile):
+        name = "main"
+        version = "1.0"
+
+        # Binary configuration
+        settings = "os", "compiler", "build_type", "arch"
+        options = {{"shared": [True, False], "fPIC": [True, False]}}
+        default_options = {{"shared": True, "fPIC": True}}
+
+        # Sources are located in the same place as this recipe, copy them to the recipe
+        exports_sources = "CMakeLists.txt", "src/*"
+        generators = "CMakeDeps", "CMakeToolchain", "VirtualRunEnv"
+        requires = lib_b/1.0@lasote/stable
+
+        def build(self):
+            cmake = CMake(self)
+            cmake.configure()
+            cmake.build()
+            if {nosoname}:
+                t = PatchELF(self)
+                t.set_soname()
     """)
     cpp = gen_function_cpp(name="main", includes=["lib_b"], calls=["lib_b"])
     client2.save({"CMakeLists.txt": cmakelists.format(current_folder=client.current_folder),
                   "src/example.cpp": cpp,
-                  "conanfile.txt": conanfile},
+                  "conanfile.txt": conanfile.format(nosoname=bool(nosoname))},
                  clean_first=True)
     client2.run('install . ')
     # Activate the VirtualRunEnv and execute the CMakeToolchain
