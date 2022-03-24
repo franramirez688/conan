@@ -163,7 +163,7 @@ def test_no_soname_flag(nosoname):
         # Sources are located in the same place as this recipe, copy them to the recipe
         exports_sources = "CMakeLists.txt", "src/*"
         generators = "CMakeDeps", "CMakeToolchain", "VirtualRunEnv"
-        requires = lib_b/1.0@lasote/stable
+        requires = "lib_b/1.0@lasote/stable"
 
         def build(self):
             cmake = CMake(self)
@@ -176,7 +176,7 @@ def test_no_soname_flag(nosoname):
     cpp = gen_function_cpp(name="main", includes=["lib_b"], calls=["lib_b"])
     client2.save({"CMakeLists.txt": cmakelists.format(current_folder=client.current_folder),
                   "src/example.cpp": cpp,
-                  "conanfile.txt": conanfile.format(nosoname=bool(nosoname))},
+                  "conanfile.py": conanfile.format(nosoname=bool(nosoname))},
                  clean_first=True)
     client2.run('install . ')
     # Activate the VirtualRunEnv and execute the CMakeToolchain
