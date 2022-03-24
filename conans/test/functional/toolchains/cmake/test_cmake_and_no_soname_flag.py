@@ -151,7 +151,7 @@ def test_no_soname_flag(nosoname):
     from conan.tools.cmake import CMakeToolchain
     from conan.tools.build import PatchELF
 
-    class {name}Conan(ConanFile):
+    class AppConan(ConanFile):
         name = "main"
         version = "1.0"
 
