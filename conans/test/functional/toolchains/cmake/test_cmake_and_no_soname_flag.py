@@ -165,7 +165,7 @@ def test_no_soname_flag(nosoname):
         requires = "lib_b/1.0@lasote/stable"
 
         def generate(self):
-            self.conf_info.define("tools.build:patchelf_path", "/usr/bin/patchelf")
+            self.conf.define("tools.build:patchelf_path", "/usr/bin/patchelf")
             if {nosoname}:
                 t = PatchELF(self)
                 t.set_soname()
