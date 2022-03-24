@@ -148,7 +148,7 @@ def test_no_soname_flag(nosoname):
     """)
     conanfile = textwrap.dedent("""
     from conans import ConanFile
-    from conan.tools.cmake import CMakeToolchain
+    from conan.tools.cmake import CMakeToolchain, CMake
     from conan.tools.build import PatchELF
 
     class AppConan(ConanFile):
@@ -161,14 +161,10 @@ def test_no_soname_flag(nosoname):
         default_options = {{"shared": True, "fPIC": True}}
 
         # Sources are located in the same place as this recipe, copy them to the recipe
-        exports_sources = "CMakeLists.txt", "src/*"
         generators = "CMakeDeps", "CMakeToolchain", "VirtualRunEnv"
         requires = "lib_b/1.0@lasote/stable"
 
-        def build(self):
-            cmake = CMake(self)
-            cmake.configure()
-            cmake.build()
+        def generate(self):
             if {nosoname}:
                 t = PatchELF(self)
                 t.set_soname()
