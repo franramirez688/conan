@@ -536,3 +536,30 @@ def test_package_folder_available_consumer():
     # Installing it with "install ." without output folder
     client.run("install .")
     assert "WARN: Package folder is None? True" in client.out
+
+
+def test_install_calls_config_options():
+    """
+    The "conan install" should call "config_options" method
+    Issue related: https://github.com/conan-io/conan/issues/11832
+    """
+    client = TestClient()
+    conanfile = textwrap.dedent("""
+    from conan import ConanFile
+
+    class DemoConan(ConanFile):
+        name = "demo"
+        version = "1.0.0"
+        settings = "os", "compiler", "build_type", "arch"
+        options = {"shared": [True, False], "fPIC": [True, False]}
+        default_options = {"shared": False, "fPIC": True}
+
+        def config_options(self):
+            if self.settings.os == "Windows":
+                del self.options.fPIC
+    """)
+    client.save({"conanfile.py": conanfile})
+    # config_options should be called when "conan install"
+    client.run("install . -o fPIC=True -s os=Windows", assert_error=True)
+    assert "option 'fPIC' doesn't exist" in client.out
+    assert "Possible options are ['shared']" in client.out
