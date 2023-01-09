@@ -11,10 +11,17 @@ from conans.util.dates import timestamp_to_str
 remote_color = Color.BRIGHT_BLUE
 recipe_name_color = Color.GREEN
 recipe_color = Color.BRIGHT_WHITE
-reference_color = Color.WHITE
+package_id_color = Color.WHITE
 error_color = Color.BRIGHT_RED
 field_color = Color.BRIGHT_YELLOW
 value_color = Color.CYAN
+
+
+# def ordered_recipes_by_name(self):
+#     ret = OrderedDict()
+#     for ref, prefs in self.recipes.items():
+#         ret.setdefault(ref.name, OrderedDict()).setdefault(ref, prefs)
+#     return ret
 
 
 def print_list_text(results):
@@ -44,7 +51,7 @@ def print_list_text(results):
                                                                              else ""
                         if search_mode == ListPatternMode.SHOW_PACKAGE_IDS:
                             cli_out_write(f"{indentation * 3}PID: {pref.package_id}{pref_date}",
-                                          fg=reference_color)
+                                          fg=package_id_color)
                             if not binary_info:
                                 cli_out_write(f"{indentation * 4}Empty package information",
                                               fg=field_color)
@@ -52,7 +59,7 @@ def print_list_text(results):
                         elif search_mode in (ListPatternMode.SHOW_ALL_PREVS,
                                              ListPatternMode.SHOW_LATEST_PREV):
                             cli_out_write(f"{indentation * 3}PID: {pref.package_id}",
-                                          fg=reference_color)
+                                          fg=package_id_color)
                             cli_out_write(f"{indentation * 4}PREV: {pref.revision}{pref_date}",
                                           fg=field_color)
                             continue
@@ -114,7 +121,7 @@ def list(conan_api: ConanAPI, parser, *args):
             results[name] = {"error": str(e)}
         else:
             results[name] = list_bundle.serialize() if args.format in ("json", "html") \
-                else list_bundle.ordered_recipes_by_name
+                else list_bundle.recipes
     return {
         "results": results,
         "search_mode": ref_pattern.mode,
