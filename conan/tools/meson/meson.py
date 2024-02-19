@@ -45,8 +45,7 @@ class Meson(object):
 
         cmd += "".join([f'{cmd_param} "{meson_option}"' for meson_option in meson_filenames])
         cmd += ' "{}" "{}"'.format(build_folder, source_folder)
-        if self._conanfile.package_folder:
-            cmd += ' -Dprefix="{}"'.format(self._conanfile.package_folder.replace("\\", "/"))
+        cmd += ' --prefix=/'
         if reconfigure:
             cmd += ' --reconfigure'
         self._conanfile.output.info("Meson configure cmd: {}".format(cmd))
@@ -78,9 +77,9 @@ class Meson(object):
         Runs ``meson install -C "."`` in the build folder. Notice that it will execute
         ``self.configure(reconfigure=True)`` at first.
         """
-        self.configure(reconfigure=True)  # To re-do the destination package-folder
-        meson_build_folder = self._conanfile.build_folder
-        cmd = 'meson install -C "{}"'.format(meson_build_folder)
+        meson_build_folder = self._conanfile.build_folder.replace("\\", "/")
+        meson_package_folder = self._conanfile.package_folder.replace("\\", "/")
+        cmd = f'DESTDIR={meson_package_folder} meson install -C "{meson_build_folder}"'
         verbosity = self._install_verbosity
         if verbosity:
             cmd += " " + verbosity
