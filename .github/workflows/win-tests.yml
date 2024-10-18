@@ -1,0 +1,221 @@
+name: Windows Tests
+
+on:
+  push:
+    branches:
+      - develop2
+      - release/*
+  pull_request:
+    branches:
+      - '*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  testing:
+    strategy:
+      fail-fast: true
+      matrix:
+        python-version: ['3.9']
+        test-type: [unittests, integration, functional]
+
+    runs-on: windows-2022
+
+    name: Conan (${{ matrix.test-type }}) (${{ matrix.python-version }})
+
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: C:\Users\runneradmin\AppData\Local\pip\cache
+          key: pip-packages-${{ runner.os }}-${{ hashFiles('conans/requirements*.txt') }}
+          restore-keys: |
+            pip-packages-${{ runner.os }}-
+
+      - name: Cache Chocolatey packages
+        if: matrix.test-type == 'functional'
+        uses: actions/cache@v4
+        id: choco-packages
+        with:
+          path: |
+            C:\ProgramData\chocolatey\lib
+            C:\ProgramData\chocolatey\bin
+            C:\ProgramData\chocolatey\extensions
+            C:\ProgramData\mingw64
+          key: chocolatey-packages-${{ runner.os }}-${{ hashFiles('choco_installed_packages.lock') }}
+          restore-keys: |
+            chocolatey-packages-${{ runner.os }}-
+
+      - name: Cache VS 15 2017 packages
+        if: matrix.test-type == 'functional'
+        uses: actions/cache@v4
+        id: vs15
+        with:
+          path: C:\Program Files (x86)\Microsoft Visual Studio\2017
+          key: vs15-community-${{ runner.os }}
+          restore-keys: |
+            vs15-community-${{ runner.os }}
+
+      - name: Cache Cygwin packages
+        if: matrix.test-type == 'functional'
+        id: cygwin-tool
+        uses: actions/cache@v4
+        with:
+          path: C:\tools\cygwin\bin
+          key: cygwin-packages-${{ runner.os }}-${{ hashFiles('C:\tools\cygwin\etc\setup\installed.db') }}
+          restore-keys: |
+            cygwin-packages-${{ runner.os }}-
+
+      - name: Cache msys2 packages
+        if: matrix.test-type == 'functional'
+        id: msys2-tool
+        uses: actions/cache@v4
+        with:
+          path: |
+              C:/msys64/mingw32
+              C:/msys64/ucrt64
+              C:/msys64/mingw64
+              C:/msys64/usr
+              C:/msys64/clang64
+              C:/msys64/mingw64
+          key: msys2-packages-${{ runner.os }}-${{ hashFiles('msys-installed-packages.lock') }}
+          restore-keys: |
+            msys2-packages-${{ runner.os }}-
+
+      - name: Install Python requirements
+        run: |
+          pip install --upgrade pip
+          pip install -r conans/requirements.txt
+          pip install -r conans/requirements_server.txt
+          pip install -r conans/requirements_dev.txt
+          pip install meson
+
+      - name: Install Chocolatey packages
+        if: matrix.test-type == 'functional' && steps.choco-packages.outputs.cache-hit != 'true'
+        run: |
+          choco install pkgconfiglite --version 0.28
+          choco install ninja --version 1.10.2
+          choco install mingw
+          choco install cygwin
+          choco install cyg-get
+          choco list > choco_installed_packages.lock
+
+      - name: Install Cygwin extra packages
+        if: matrix.test-type == 'functional' && steps.cygwin-tool.outputs.cache-hit != 'true'
+        run: |
+          cyg-get automake gcc-g++ make binutils
+
+      - name: Install Pacman extra packages
+        if: matrix.test-type == 'functional' && steps.msys2-tool.outputs.cache-hit != 'true'
+        run: |
+          C:\msys64\usr\bin\pacman -Syuu --noconfirm
+          C:\msys64\usr\bin\pacman -S mingw-w64-x86_64-toolchain --noconfirm
+          C:\msys64\usr\bin\pacman -S mingw-w64-i686-toolchain --noconfirm
+          C:\msys64\usr\bin\pacman -S base-devel gcc --noconfirm
+          C:\msys64\usr\bin\pacman -S autoconf-wrapper --noconfirm
+          C:\msys64\usr\bin\pacman -S automake --noconfirm
+          C:\msys64\usr\bin\pacman -Q > msys-installed-packages.lock
+
+      - name: Install VS 15 2017 Community edition
+        if: matrix.test-type == 'functional' && steps.vs15.outputs.cache-hit != 'true'
+        run: |
+          Invoke-WebRequest -Uri "https://aka.ms/vs/15/release/vs_community.exe" -OutFile "vs_installer.exe"
+          Start-Process -FilePath ".\vs_installer.exe" -ArgumentList `
+           "--quiet",  "--wait", "--norestart", "--nocache", `
+           "--add", "Microsoft.VisualStudio.Workload.VCTools", `
+           "--add", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", `
+           "--add", "Microsoft.VisualStudio.Component.Windows10SDK.16299.Desktop", `
+           "--add", "Microsoft.VisualStudio.Component.Windows10SDK.17763", `
+           "--add", "Microsoft.VisualStudio.ComponentGroup.NativeDesktop.Core", `
+           "--add", "Microsoft.Component.MSBuild", `
+           "--add", "Microsoft.VisualStudio.Component.VC.CMake.Project", `
+           "--add", "Microsoft.VisualStudio.Workload.NativeDesktop", `
+           "--add", "Microsoft.VisualStudio.Component.VC.CoreBuildTools", `
+           "--add", "Microsoft.VisualStudio.Component.VC.ATLMFC" -Wait
+
+      - name: Cache CMake and Bazel installations
+        if: matrix.test-type == 'functional'
+        id: cache-tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            C:\Tools\CMake\3.15.7
+            C:\Tools\CMake\3.19.7
+            C:\Tools\CMake\3.23.5
+            C:\Tools\bazel\6.3.2
+            C:\Tools\bazel\7.1.2
+          key: ${{ runner.os }}-conan-tools-cache
+
+      - name: Build CMake old versions of CMake
+        if: matrix.test-type == 'functional' && steps.cache-tools.outputs.cache-hit != 'true'
+        run: |
+          $CMAKE_BUILD_VERSIONS = "3.15.7", "3.19.7"
+          foreach ($version in $CMAKE_BUILD_VERSIONS) {
+            Write-Host "Downloading CMake version $version for Windows..."
+            $destination = "C:\Tools\CMake\$version"
+            if (-not (Test-Path $destination)) {
+                New-Item -Path $destination -ItemType Directory
+            }
+            $major_minor_version = ($version -split '\.')[0..1] -join '.'
+            $url = "https://cmake.org/files/v$major_minor_version/cmake-$version-win64-x64.zip"
+            $zipFile = "cmake-$version-windows-x86_64.zip"
+            Invoke-WebRequest -Uri $url -OutFile $zipFile
+            Expand-Archive -Path $zipFile -DestinationPath $destination -Force
+            Remove-Item $zipFile
+          }
+      - name: Install modern CMake versions
+        if: matrix.test-type == 'functional' && steps.cache-tools.outputs.cache-hit != 'true'
+        run: |
+          $CMAKE_BUILD_VERSIONS = "3.23.5"
+          foreach ($version in $CMAKE_BUILD_VERSIONS) {
+            $destination = "C:\Tools\CMake\$version"
+            if (-not (Test-Path $destination)) {
+                New-Item -Path $destination -ItemType Directory
+            }
+            $major_minor_version = ($version -split '\.')[0..1] -join '.'
+            $url = "https://cmake.org/files/v$major_minor_version/cmake-$version-windows-x86_64.zip"
+            $zipFile = "cmake-$version-windows-x86_64.zip"
+            Invoke-WebRequest -Uri $url -OutFile $zipFile
+            Expand-Archive -Path $zipFile -DestinationPath $destination -Force
+            Remove-Item $zipFile
+          }
+      - name: Install Bazel versions
+        if: matrix.test-type == 'functional' && steps.cache-tools.outputs.cache-hit != 'true'
+        run: |
+          $BAZEL_BUILD_VERSIONS = "6.3.2", "7.1.2"
+          foreach ($version in $BAZEL_BUILD_VERSIONS) {
+              Write-Host "Downloading Bazel version $version for Windows..."
+              $destination = "C:\Tools\bazel\$version"
+              if (-not (Test-Path $destination)) {
+                  New-Item -Path $destination -ItemType Directory
+              }
+              $major_minor_version = ($version -split '\.')[0..1] -join '.'
+              $url = "https://github.com/bazelbuild/bazel/releases/download/$version/bazel-$version-windows-x86_64.zip"
+              $zipFile = "bazel-$version-windows-x86_64.zip"
+              Invoke-WebRequest -Uri $url -OutFile $zipFile
+              Expand-Archive -Path $zipFile -DestinationPath $destination -Force
+              Remove-Item $zipFile
+          }
+      - name: Run Tests
+        run: |
+          $NUM_CPUS = (Get-CimInstance -ClassName Win32_Processor | Measure-Object -Property NumberOfCores -Sum).Sum
+          Write-Host "Number of CPUs available: $NUM_CPUS"
+          $matrixTestType = "${{ matrix.test-type }}"
+          if ($matrixTestType -eq "unittests") {
+              Write-Host "pytest test/unittests --durations=20 -n $NUM_CPUS"
+          } elseif ($matrixTestType -eq "integration") {
+              Write-Host "pytest test/integration --durations=20 -n $NUM_CPUS"
+          } elseif ($matrixTestType -eq "functional") {
+              pytest test/functional --durations=20 -n $NUM_CPUS
+          }
