@@ -451,6 +451,15 @@ class MesonToolchain:
         self.cpp = os.path.join(ndk_bin, f"{android_target}{android_api_level}-clang++{compile_ext}")
         self.ar = os.path.join(ndk_bin, "llvm-ar")
 
+    @property
+    def _rpath_link_flag(self):
+        runtime_dirs = []
+        host_req = self._conanfile.dependencies.filter({"build": False}).values()
+        for req in host_req:
+            cppinfo = req.cpp_info.aggregated_components()
+            runtime_dirs.extend(cppinfo.libdirs)
+        return ["-Wl,-rpath-link=" + ":".join(runtime_dirs)] if runtime_dirs else []
+
     def _get_extra_flags(self):
         # Now, it's time to get all the flags defined by the user
         cxxflags = self._conanfile_conf.get("tools.build:cxxflags", default=[], check_type=list)
@@ -474,7 +483,7 @@ class MesonToolchain:
             "cxxflags": [self.arch_flag] + cxxflags + sys_root + self.extra_cxxflags
                         + self.threads_flags,
             "cflags": [self.arch_flag] + cflags + sys_root + self.extra_cflags + self.threads_flags,
-            "ldflags": [self.arch_flag] + [self.arch_link_flag] + ld,
+            "ldflags": [self.arch_flag] + [self.arch_link_flag] + ld + self._rpath_link_flag,
             "defines": [f"-D{d}" for d in (defines + self.extra_defines)]
         }
 
