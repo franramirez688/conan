@@ -10,12 +10,13 @@ from conan.errors import ConanException
 from conan.internal import check_duplicated_generator
 from conan.internal.api.install.generators import relativize_path
 from conan.internal.model.dependencies import get_transitive_requires
+from conan.internal.util.files import load
 from conan.tools.cmake.cmakeconfigdeps.config import ConfigTemplate2
 from conan.tools.cmake.cmakeconfigdeps.config_version import ConfigVersionTemplate2
 from conan.tools.cmake.cmakeconfigdeps.target_configuration import TargetConfigurationTemplate2
 from conan.tools.cmake.cmakeconfigdeps.targets import TargetsTemplate2
+from conan.tools.cmake.utils import cmake_join_paths
 from conan.tools.files import save
-from conan.internal.util.files import load
 
 FIND_MODE_MODULE = "module"
 FIND_MODE_CONFIG = "config"
@@ -202,13 +203,6 @@ class CMakeConfigDeps:
         return get_transitive_requires(self._conanfile, conanfile)
 
 
-# TODO: Repeated from CMakeToolchain blocks
-def _join_paths(conanfile, paths):
-    paths = [p.replace('\\', '/').replace('$', '\\$').replace('"', '\\"') for p in paths]
-    paths = [relativize_path(p, conanfile, "${CMAKE_CURRENT_LIST_DIR}") for p in paths]
-    return " ".join([f'"{p}"' for p in paths])
-
-
 class _PathGenerator:
     _conan_cmakedeps_paths = "conan_cmakedeps_paths.cmake"
 
@@ -368,11 +362,11 @@ class _PathGenerator:
         context = {"host_runtime_dirs": self._get_host_runtime_dirs(),
                    "pkg_paths": pkg_paths,
                    "pkg_paths_multi": pkg_paths_multi,
-                   "cmake_program_path": _join_paths(self._conanfile, cmake_program_path),
-                   "cmake_library_path": _join_paths(self._conanfile, cmake_library_path),
-                   "cmake_include_path": _join_paths(self._conanfile, cmake_include_path),
-                   "cmake_framework_path": _join_paths(self._conanfile, cmake_framework_path),
-                   "cmake_module_path": _join_paths(self._conanfile, cmake_module_path)
+                   "cmake_program_path": cmake_join_paths(self._conanfile, cmake_program_path),
+                   "cmake_library_path": cmake_join_paths(self._conanfile, cmake_library_path),
+                   "cmake_include_path": cmake_join_paths(self._conanfile, cmake_include_path),
+                   "cmake_framework_path": cmake_join_paths(self._conanfile, cmake_framework_path),
+                   "cmake_module_path": cmake_join_paths(self._conanfile, cmake_module_path)
                    }
         content = Template(template, trim_blocks=True, lstrip_blocks=True).render(context)
         save(self._conanfile, self._conan_cmakedeps_paths, content)

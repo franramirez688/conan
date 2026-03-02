@@ -5,22 +5,23 @@ from collections import OrderedDict
 
 from jinja2 import Template
 
+from conan.errors import ConanException
+from conan.internal.api.install.generators import relativize_path
 from conan.internal.internal_tools import universal_arch_separator, is_universal_arch
-from conan.tools.apple.apple import get_apple_sdk_fullname, _to_apple_arch
+from conan.internal.model.version import Version
+from conan.internal.subsystems import deduce_subsystem, WINDOWS
+from conan.internal.util.files import load
 from conan.tools.android.utils import android_abi
+from conan.tools.apple.apple import get_apple_sdk_fullname, _to_apple_arch
 from conan.tools.apple.apple import is_apple_os, to_apple_arch
 from conan.tools.build import build_jobs
-from conan.tools.build.flags import architecture_flag, architecture_link_flag, libcxx_flags, threads_flags
 from conan.tools.build.cross_building import cross_building
+from conan.tools.build.flags import architecture_flag, architecture_link_flag, libcxx_flags, \
+    threads_flags
 from conan.tools.cmake.toolchain import CONAN_TOOLCHAIN_FILENAME
-from conan.tools.cmake.utils import is_multi_configuration, cmake_escape_value
+from conan.tools.cmake.utils import is_multi_configuration, cmake_escape_value, cmake_join_paths
 from conan.tools.intel import IntelCC
 from conan.tools.microsoft.visual import msvc_version_to_toolset_version, msvc_platform_from_arch
-from conan.internal.api.install.generators import relativize_path
-from conan.internal.subsystems import deduce_subsystem, WINDOWS
-from conan.errors import ConanException
-from conan.internal.model.version import Version
-from conan.internal.util.files import load
 
 
 class Block:
@@ -666,11 +667,6 @@ class FindFiles(Block):
 
         return host_runtime_dirs
 
-    def _join_paths(self, paths):
-        paths = [p.replace('\\', '/').replace('$', '\\$').replace('"', '\\"') for p in paths]
-        paths = [relativize_path(p, self._conanfile, "${CMAKE_CURRENT_LIST_DIR}") for p in paths]
-        return " ".join([f'"{p}"' for p in paths])
-
     def context(self):
         # To find the generated cmake_find_package finders
         # TODO: Change this for parameterized output location of CMakeDeps
@@ -709,11 +705,11 @@ class FindFiles(Block):
         return {
             "find_package_prefer_config": find_package_prefer_config,
             "generators_folder": "${CMAKE_CURRENT_LIST_DIR}",
-            "build_paths": self._join_paths(build_paths),
-            "cmake_program_path": self._join_paths(build_bin_paths),
-            "cmake_library_path": self._join_paths(host_lib_paths),
-            "cmake_framework_path": self._join_paths(host_framework_paths),
-            "cmake_include_path": self._join_paths(host_include_paths),
+            "build_paths": cmake_join_paths(self._conanfile, build_paths),
+            "cmake_program_path": cmake_join_paths(self._conanfile, build_bin_paths),
+            "cmake_library_path": cmake_join_paths(self._conanfile, host_lib_paths),
+            "cmake_framework_path": cmake_join_paths(self._conanfile, host_framework_paths),
+            "cmake_include_path": cmake_join_paths(self._conanfile, host_include_paths),
             "is_apple": is_apple_,
             "cross_building": cross_building(self._conanfile),
             "host_runtime_dirs": self._runtime_dirs_value(host_runtime_dirs)

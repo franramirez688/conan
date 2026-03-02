@@ -58,3 +58,10 @@ def cmake_escape_value(v):
                 yield char
 
     return "".join(_stream_chars(v))
+
+
+def cmake_join_paths(conanfile, paths):
+    from conan.internal.api.install.generators import relativize_path
+    paths = [p.replace('\\', '/').replace('$', '\\$').replace('"', '\\"') for p in paths]
+    paths = [relativize_path(p, conanfile, "${CMAKE_CURRENT_LIST_DIR}") for p in paths]
+    return " ".join([f'"{p}"' for p in paths])
