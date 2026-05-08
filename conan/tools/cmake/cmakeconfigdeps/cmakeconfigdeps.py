@@ -9,13 +9,9 @@ from conan.api.output import Color, ConanOutput
 from conan.errors import ConanException
 from conan.internal import check_duplicated_generator
 from conan.internal.api.install.generators import relativize_path
-from conan.internal.model.dependencies import get_transitive_requires
-from conan.tools.cmake.cmakeconfigdeps.config import ConfigTemplate2
-from conan.tools.cmake.cmakeconfigdeps.config_version import ConfigVersionTemplate2
-from conan.tools.cmake.cmakeconfigdeps.target_configuration import TargetConfigurationTemplate2
-from conan.tools.cmake.cmakeconfigdeps.targets import TargetsTemplate2
-from conan.tools.files import save
 from conan.internal.util.files import load
+from conan.tools.cmake.cmakeconfigdeps.cmake_config_info import CMakeFilesConfigInfo
+from conan.tools.files import save
 
 FIND_MODE_MODULE = "module"
 FIND_MODE_CONFIG = "config"
@@ -118,19 +114,7 @@ class CMakeConfigDeps:
 
             if require.direct:
                 direct_deps.append((require, dep))
-            full_cpp_info = dep.cpp_info.deduce_full_cpp_info(dep)
-            config = ConfigTemplate2(self, require, dep, full_cpp_info)
-            ret[config.filename] = config.content()
-            base_filename = self.get_cmake_filename(dep)
-            properties = {"cmake_config_version_compat": self.get_property("cmake_config_version_compat", dep),
-                          "system_package_version": self.get_property("system_package_version", dep)}
-            config_version = ConfigVersionTemplate2(base_filename, dep.ref.version, properties)
-            ret[config_version.filename] = config_version.content()
-
-            targets = TargetsTemplate2(base_filename)
-            ret[targets.filename] = targets.content()
-            target_configuration = TargetConfigurationTemplate2(self, dep, require, full_cpp_info)
-            ret[target_configuration.filename] = target_configuration.content()
+            ret.update(CMakeFilesConfigInfo(self, dep, require).items())
 
         self._print_help(direct_deps)
         return ret
@@ -188,25 +172,6 @@ class CMakeConfigDeps:
             comp = dep.cpp_info.components.get(comp_name)  # it is a default dict
             if comp is not None:
                 return comp.get_property(prop, check_type=check_type)
-
-    def get_cmake_filename(self, dep):
-        # Get the name of the file for the find_package(XXX)
-        # This is used by CMakeDeps to determine:
-        # - The filename to generate (XXX-config.cmake or FindXXX.cmake)
-        # - The name of the defined XXX_DIR variables
-        # - The name of transitive dependencies for calls to find_dependency
-        ret = self.get_property("cmake_file_name", dep)
-        return ret or dep.ref.name
-
-    def _get_find_mode(self, dep):
-        tmp = self.get_property("cmake_find_mode", dep)
-        if tmp is None:
-            return "config"
-        return tmp.lower()
-
-    def get_transitive_requires(self, conanfile):
-        # Prepared to filter transitive tool-requires with visible=True
-        return get_transitive_requires(self._conanfile, conanfile)
 
 
 # TODO: Repeated from CMakeToolchain blocks

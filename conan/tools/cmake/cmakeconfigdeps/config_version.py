@@ -1,8 +1,5 @@
 import textwrap
 
-import jinja2
-from jinja2 import Template
-
 from conan.errors import ConanException
 
 
@@ -10,30 +7,18 @@ class ConfigVersionTemplate2:
     """
     foo-config-version.cmake
     """
-    def __init__(self, filename, version, properties):
-        self._filename = filename
-        self._properties = properties
-        self._version = version
-
-    def content(self):
-        t = Template(self._template, trim_blocks=True, lstrip_blocks=True,
-                     undefined=jinja2.StrictUndefined)
-        return t.render(self._context)
-
-    @property
-    def filename(self):
-        f = self._filename
-        return f"{f}-config-version.cmake" if f == f.lower() else f"{f}ConfigVersion.cmake"
+    def __init__(self, cmake_info):
+        self._cmake_info = cmake_info
 
     @property
     def _context(self):
-        policy = self._properties.get("cmake_config_version_compat")
+        policy = self._cmake_info.properties.get("cmake_config_version_compat")
         if policy is None:
             policy = "SameMajorVersion"
         if policy not in ("AnyNewerVersion", "SameMajorVersion", "SameMinorVersion", "ExactVersion"):
-            raise ConanException(f"Unknown cmake_config_version_compat={policy} in {self.filename}")
-        version = self._properties.get("system_package_version")
-        version = version or self._version
+            raise ConanException(f"Unknown cmake_config_version_compat={policy} in {self._cmake_info.config_version_filename}")
+        version = self._cmake_info.properties.get("system_package_version")
+        version = version or self._cmake_info.pkg_version
         return {"version": version,
                 "policy": policy}
 

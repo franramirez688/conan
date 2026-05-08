@@ -1,29 +1,16 @@
 import textwrap
 
-import jinja2
-from jinja2 import Template
-
 
 class TargetsTemplate2:
     """
     FooTargets.cmake
     """
-    def __init__(self, filename):
-        self._filename = filename
-
-    def content(self):
-        t = Template(self._template, trim_blocks=True, lstrip_blocks=True,
-                     undefined=jinja2.StrictUndefined)
-        return t.render(self._context)
-
-    @property
-    def filename(self):
-        return f"{self._filename}Targets.cmake"
+    def __init__(self, cmake_info):
+        self._cmake_info = cmake_info
 
     @property
     def _context(self):
-        ret = {"filename": self._filename}
-        return ret
+        return {"filename": self._cmake_info.targets_filename}
 
     @property
     def _template(self):
