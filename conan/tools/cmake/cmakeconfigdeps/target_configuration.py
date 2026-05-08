@@ -95,7 +95,7 @@ class TargetConfigurationTemplate2:
         return result
 
     @property
-    def _context(self):
+    def context(self):
         cpp_info = self._full_cpp_info
         assert isinstance(cpp_info.type, PackageType)
         pkg_name = self._conanfile.ref.name
@@ -318,7 +318,7 @@ class TargetConfigurationTemplate2:
         return f"${{{pkg_folder_var}}}/{escape(p)}"
 
     @property
-    def _template(self):
+    def template(self):
         # TODO: CMake 3.24: Apple Frameworks: https://cmake.org/cmake/help/latest/manual/cmake-generator-expressions.7.html#genex:LINK_LIBRARY
         # TODO: Check why not set_property instead of target_link_libraries
         return textwrap.dedent("""\

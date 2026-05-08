@@ -13,7 +13,7 @@ class ConfigTemplate2:
         self._cmake_info = cmake_info
 
     @property
-    def _context(self):
+    def context(self):
         build_modules_paths = self._cmake_info.properties("cmake_build_modules",
                                                            check_type=list) or []
         # FIXME: Proper escaping of paths for CMake and relativization
@@ -93,7 +93,7 @@ class ConfigTemplate2:
                 "libraries": libraries}
 
     @property
-    def _template(self):
+    def template(self):
         return textwrap.dedent("""\
         # Requires CMake > 3.15
         if(${CMAKE_VERSION} VERSION_LESS "3.15")

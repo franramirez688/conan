@@ -11,7 +11,7 @@ class ConfigVersionTemplate2:
         self._cmake_info = cmake_info
 
     @property
-    def _context(self):
+    def context(self):
         policy = self._cmake_info.properties.get("cmake_config_version_compat")
         if policy is None:
             policy = "SameMajorVersion"
@@ -23,7 +23,7 @@ class ConfigVersionTemplate2:
                 "policy": policy}
 
     @property
-    def _template(self):
+    def template(self):
         # https://gitlab.kitware.com/cmake/cmake/blob/master/Modules/BasicConfigVersion-SameMajorVersion.cmake.in
         # This will be at XXX-config-version.cmake
         # AnyNewerVersion|SameMajorVersion|SameMinorVersion|ExactVersion

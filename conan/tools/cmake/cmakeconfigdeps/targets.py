@@ -9,11 +9,11 @@ class TargetsTemplate2:
         self._cmake_info = cmake_info
 
     @property
-    def _context(self):
+    def context(self):
         return {"filename": self._cmake_info.targets_filename}
 
     @property
-    def _template(self):
+    def template(self):
         return textwrap.dedent("""\
             include_guard()
             message(STATUS "Conan: Configuring Targets for {{ filename }}")
