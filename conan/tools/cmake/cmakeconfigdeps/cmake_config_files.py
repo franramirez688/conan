@@ -88,9 +88,9 @@ class CMakeConfigFiles:
     def targets_filename(self):
         return f"{self._filename}Targets.cmake"
 
-    def properties(self, prop, dep=None, **kwargs):
+    def properties(self, prop, dep=None, comp_name=None, check_type=None):
         dep = dep or self.conanfile
-        return self._cmakeconfigdeps.get_property(prop, dep, **kwargs)
+        return self._cmakeconfigdeps.get_property(prop, dep, comp_name=comp_name, check_type=check_type)
 
     @staticmethod
     def _render_content(cmake_class_type):

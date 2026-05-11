@@ -12,12 +12,12 @@ class ConfigVersionTemplate2:
 
     @property
     def context(self):
-        policy = self._cmake_info.properties.get("cmake_config_version_compat")
+        policy = self._cmake_info.properties("cmake_config_version_compat")
         if policy is None:
             policy = "SameMajorVersion"
         if policy not in ("AnyNewerVersion", "SameMajorVersion", "SameMinorVersion", "ExactVersion"):
             raise ConanException(f"Unknown cmake_config_version_compat={policy} in {self._cmake_info.config_version_filename}")
-        version = self._cmake_info.properties.get("system_package_version")
+        version = self._cmake_info.properties("system_package_version")
         version = version or self._cmake_info.pkg_version
         return {"version": version,
                 "policy": policy}

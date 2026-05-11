@@ -266,12 +266,13 @@ class _PathGenerator:
                     path_list.append(captured_path)
 
         for req, dep in all_reqs:
-            cmake_find_mode = self._cmakedeps.get_property("cmake_find_mode", dep)
+            cmake_files_info = CMakeConfigFiles(self._cmakedeps, dep, req)
+            cmake_find_mode = cmake_files_info.properties("cmake_find_mode")
             cmake_find_mode = cmake_find_mode or FIND_MODE_CONFIG
             cmake_find_mode = cmake_find_mode.lower()
 
-            cmake_filename = self._cmakedeps.get_cmake_filename(dep)
-            extra_variants = self._cmakedeps.get_property("cmake_file_name_variants", dep,
+            cmake_filename = cmake_files_info.get_cmake_filename()
+            extra_variants = cmake_files_info.properties("cmake_file_name_variants",
                                                           check_type=list) or []
             lowercase_variants = {variant.lower() for variant in extra_variants}
             if len(lowercase_variants) > 1:
@@ -279,7 +280,7 @@ class _PathGenerator:
                                      "They should be the same with different upper/lower cases only.")
             if lowercase_variants:
                 if cmake_filename.lower() not in lowercase_variants:
-                    is_cmake_filename_defined = self._cmakedeps.get_property("cmake_file_name", dep) is not None
+                    is_cmake_filename_defined = cmake_files_info.properties("cmake_file_name") is not None
                     if is_cmake_filename_defined:
                         extra_variants = []
                         msg = (f"'{dep.ref}' 'cmake_file_name_variants' property contains names "

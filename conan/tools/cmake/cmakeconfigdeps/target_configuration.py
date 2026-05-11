@@ -212,7 +212,7 @@ class TargetConfigurationTemplate2:
 
     def _get_aliases(self, comp_name=None):
         aliases = self._cmake_info.properties("cmake_target_aliases",
-                                              comp_name, check_type=list) or []
+                                              comp_name=comp_name, check_type=list) or []
         return aliases
 
     def _add_root_lib_target(self, libs, cpp_info):
