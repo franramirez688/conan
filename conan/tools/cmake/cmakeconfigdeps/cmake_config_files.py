@@ -8,21 +8,48 @@ from conan.tools.cmake.cmakeconfigdeps.target_configuration import TargetConfigu
 from conan.tools.cmake.cmakeconfigdeps.targets import TargetsTemplate2
 
 
-class CMakeFilesConfigInfo:
+class CMakeConfigFiles:
 
     def __init__(self, cmakeconfigdeps, dep, require):
         self._cmakeconfigdeps = cmakeconfigdeps
         self._require = require
-        self.is_build_context = require.build
         self._filename = self.get_cmake_filename(dep)
         self.conanfile = dep
         self.consumer_conanfile = self._cmakeconfigdeps._conanfile  # noqa
-        self.config = self.conanfile.settings.get_safe("build_type", self._cmakeconfigdeps.configuration)
+        self.is_build_context = require.build
         self.full_cpp_info = dep.cpp_info.deduce_full_cpp_info(dep)
         # Prepared to filter transitive tool-requires with visible=True
         self.transitive_requires = get_transitive_requires(self.consumer_conanfile, dep)  # noqa
-        self.pkg_name = dep.ref.name
-        self.pkg_version = dep.ref.version
+
+    @property
+    def pkg_name(self):
+        return self.conanfile.ref.name
+
+    @property
+    def pkg_version(self):
+        return self.conanfile.ref.version
+
+    @property
+    def config(self):
+        config = self.conanfile.settings.get_safe("build_type", self._cmakeconfigdeps.configuration)
+        return config.upper() if config else None
+
+    @property
+    def has_headers(self):
+        # FIXME: Filter by lib traits!!!!!
+        return self._require.headers
+
+    @property
+    def package_folder(self):
+        return self.conanfile.package_folder.replace("\\", "/")
+
+    @property
+    def package_folder_var(self):
+        # fallback to consumer configuration if it doesn't have build_type
+        config = self.config
+        config_folder = f"_{config}" if config else ""
+        build = "_BUILD" if self.is_build_context else ""
+        return f"{self.pkg_name}_PACKAGE_FOLDER{config_folder}{build}"
 
     def get_cmake_filename(self, dep=None):
         # Get the name of the file for the find_package(XXX)
@@ -37,7 +64,7 @@ class CMakeFilesConfigInfo:
     def get_cmake_target_name(self, dep=None, comp_name=None):
         dep = dep or self.conanfile
         target_name = self.properties("cmake_target_name", dep=dep, comp_name=comp_name)
-        return target_name or f"{self.pkg_name}::{self.pkg_name if comp_name else self.pkg_name}"
+        return target_name or f"{dep.ref.name}::{dep.ref.name if comp_name else dep.ref.name}"
 
     @property
     def config_filename(self):

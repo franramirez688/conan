@@ -3,7 +3,6 @@ import textwrap
 
 from conan.errors import ConanException
 from conan.internal.api.install.generators import relativize_path
-from conan.internal.graph.graph import CONTEXT_BUILD
 from conan.internal.model.pkg_type import PackageType
 from conan.tools.cmake.utils import cmake_escape_value
 
@@ -19,7 +18,6 @@ class TargetConfigurationTemplate2:
     def _requires(self, info, components):
         result = {}
         requires = info.parsed_requires()
-        pkg_name = self._cmake_info.pkg_name
         pkg_type = info.type
         assert isinstance(pkg_type, PackageType), f"Pkg type {pkg_type} {type(pkg_type)}"
         transitive_reqs = self._cmake_info.transitive_requires
@@ -29,8 +27,7 @@ class TargetConfigurationTemplate2:
             for req, d in transitive_reqs.items():
                 if d.package_type is PackageType.APP:
                     continue
-                dep_target = self._cmake_info.properties("cmake_target_name", dep=d)
-                dep_target = dep_target or f"{d.ref.name}::{d.ref.name}"
+                dep_target = self._cmake_info.get_cmake_target_name(dep=d)
                 link_feature = self._cmake_info.properties("cmake_link_feature", dep=d)
                 link = req.libs
                 result[dep_target] = {
@@ -43,9 +40,7 @@ class TargetConfigurationTemplate2:
             if required_pkg is None:  # Points to a component of same package
                 dep_comp = components.get(required_comp)
                 assert dep_comp, f"Component {required_comp} not found in {self._cmake_info.conanfile}"
-                dep_target = self._cmake_info.properties("cmake_target_name",
-                                                          comp_name=required_comp)
-                dep_target = dep_target or f"{pkg_name}::{required_comp}"
+                dep_target = self._cmake_info.get_cmake_target_name(comp_name=required_comp)
                 link_feature = self._cmake_info.properties("cmake_link_feature",
                                                             comp_name=required_comp)
                 result[dep_target] = {
@@ -98,25 +93,16 @@ class TargetConfigurationTemplate2:
     def context(self):
         cpp_info = self._cmake_info.full_cpp_info
         assert isinstance(cpp_info.type, PackageType)
-        pkg_name = self._cmake_info.pkg_name
-        # fallback to consumer configuration if it doesn't have build_type
-        config = self._cmake_info.config
-        config = config.upper() if config else None
-        pkg_folder = self._cmake_info.conanfile.package_folder.replace("\\", "/")
-        config_folder = f"_{config}" if config else ""
-        build = "_BUILD" if self._cmake_info.is_build_context else ""
-        pkg_folder_var = f"{pkg_name}_PACKAGE_FOLDER{config_folder}{build}"
 
         libs = {}
         # The BUILD context does not generate libraries targets atm
         if not self._cmake_info.is_build_context:
-            libs = self._get_libs(cpp_info, pkg_name, pkg_folder, pkg_folder_var)
-            self._add_root_lib_target(libs, pkg_name, cpp_info)
-        exes = self._get_exes(cpp_info, pkg_name, pkg_folder, pkg_folder_var)
+            libs = self._get_libs(cpp_info)
+            self._add_root_lib_target(libs, cpp_info)
+        exes = self._get_exes(cpp_info)
 
         seen_aliases = set()
-        root_target_name = self._cmake_info.properties("cmake_target_name")
-        root_target_name = root_target_name or f"{pkg_name}::{pkg_name}"
+        root_target_name = self._cmake_info.get_cmake_target_name()
         for lib in libs.values():
             for alias in lib.get("cmake_target_aliases", []):
                 if alias == root_target_name:
@@ -131,54 +117,52 @@ class TargetConfigurationTemplate2:
                     raise ConanException(f"Alias '{alias}' already defined as a target in "
                                          f"{self._cmake_info.conanfile}. ")
 
-        pkg_folder = relativize_path(pkg_folder, self._cmake_info.consumer_conanfile,
+        pkg_folder = relativize_path(self._cmake_info.package_folder, self._cmake_info.consumer_conanfile,
                                      "${CMAKE_CURRENT_LIST_DIR}")
         dependencies = self._get_dependencies()
         return {"dependencies": dependencies,
                 "pkg_folder": pkg_folder,
-                "pkg_folder_var": pkg_folder_var,
-                "config": config,
+                "pkg_folder_var": self._cmake_info.package_folder_var,
+                "config": self._cmake_info.config,
                 "exes": exes,
                 "libs": libs,
                 "context": self._cmake_info.conanfile.context
                 }
 
-    def _get_libs(self, cpp_info, pkg_name, pkg_folder, pkg_folder_var) -> dict:
+    def _get_libs(self, cpp_info) -> dict:
         libs = {}
         if cpp_info.has_components:
             for name, component in cpp_info.components.items():
                 target_name = self._cmake_info.get_cmake_target_name(comp_name=name)
-                target = self._get_cmake_lib(component, cpp_info.components, pkg_folder,
-                                             pkg_folder_var, comp_name=name)
+                target = self._get_cmake_lib(component, cpp_info.components, comp_name=name)
                 if target is not None:
                     cmake_target_aliases = self._get_aliases(name)
                     target["cmake_target_aliases"] = cmake_target_aliases
                     libs[target_name] = target
         else:
             target_name = self._cmake_info.get_cmake_target_name()
-            target = self._get_cmake_lib(cpp_info, None, pkg_folder, pkg_folder_var)
+            target = self._get_cmake_lib(cpp_info, None)
             if target is not None:
                 cmake_target_aliases = self._get_aliases()
                 target["cmake_target_aliases"] = cmake_target_aliases
                 libs[target_name] = target
         return libs
 
-    def _get_cmake_lib(self, info, components, pkg_folder, pkg_folder_var, comp_name=None):
+    def _get_cmake_lib(self, info, components, comp_name=None):
         if info.exe or not (info.package_framework or info.frameworks or info.includedirs or info.libs
                             or info.system_libs or info.defines or info.requires):
             return
 
-        includedirs = ";".join(self._path(i, pkg_folder, pkg_folder_var)
+        includedirs = ";".join(self._cmake_path(i)
                                for i in info.includedirs) if info.includedirs else ""
         requires = self._requires(info, components)
         assert isinstance(requires, dict)
         defines = ";".join(cmake_escape_value(f) for f in info.defines)
-        # FIXME: Filter by lib traits!!!!!
-        if not self._cmake_info._require.headers:  # If not depending on headers, paths and
+        if not self._cmake_info.has_headers:  # If not depending on headers, paths and
             includedirs = defines = None
         extra_libs = self._cmake_info.properties("cmake_extra_interface_libs",
                                                  comp_name=comp_name, check_type=list) or []
-        sources = [self._path(source, pkg_folder, pkg_folder_var) for source in info.sources]
+        sources = [self._cmake_path(source) for source in info.sources]
         target = {"type": "INTERFACE",
                   "comp_name": comp_name,
                   "includedirs": includedirs,
@@ -203,19 +187,17 @@ class TargetConfigurationTemplate2:
             assert lib_type, f"Unknown package type {info.type}"
             assert info.location, f"cpp_info.location missing for framework {info.package_framework}"
             target["type"] = lib_type
-            target["package_framework"]["location"] = self._path(info.location, pkg_folder,
-                                                                 pkg_folder_var)
+            target["package_framework"]["location"] = self._cmake_path(info.location)
             target["includedirs"] = []  # empty as frameworks have their own way to inject headers
             # FIXME: This is not needed for CMake < 3.24. Remove it when Conan requires CMake >= 3.24
-            target["package_framework"]["frameworkdir"] = self._path(pkg_folder, pkg_folder,
-                                                                     pkg_folder_var)
+            target["package_framework"]["frameworkdir"] = self._cmake_path(self._cmake_info.package_folder)
         if info.libs:
             if len(info.libs) != 1:
                 raise ConanException(f"New CMakeDeps only allows 1 lib per component:\n"
                                      f"{self._cmake_info.conanfile}: {info.libs}")
             assert info.location, "info.location missing for .libs, it should have been deduced"
-            location = self._path(info.location, pkg_folder, pkg_folder_var)
-            link_location = self._path(info.link_location, pkg_folder, pkg_folder_var) \
+            location = self._cmake_path(info.location)
+            link_location = self._cmake_path(info.link_location) \
                 if info.link_location else None
             lib_type = "SHARED" if info.type is PackageType.SHARED else \
                 "STATIC" if info.type is PackageType.STATIC else None
@@ -233,7 +215,7 @@ class TargetConfigurationTemplate2:
                                               comp_name, check_type=list) or []
         return aliases
 
-    def _add_root_lib_target(self, libs, pkg_name, cpp_info):
+    def _add_root_lib_target(self, libs, cpp_info):
         """
         Add a new pkgname::pkgname INTERFACE target that depends on default_components or
         on all other library targets (not exes)
@@ -246,9 +228,8 @@ class TargetConfigurationTemplate2:
             if cpp_info.default_components is not None:
                 all_requires = {}
                 for defaultc in cpp_info.default_components:
-                    target_name = self._cmake_info.get_cmake_target_name(comp_name=defaultc)
-                    comp_name = target_name or f"{pkg_name}::{defaultc}"
-                    link_feature = self._cmake_info.get_cmake_target_name(comp_name=defaultc)
+                    comp_name = self._cmake_info.get_cmake_target_name(comp_name=defaultc)
+                    link_feature = self._cmake_info.properties("cmake_link_feature", comp_name=defaultc)
                     all_requires[comp_name] = {
                         "link": True,  # It is an interface, full link
                         "link_feature": link_feature
@@ -266,19 +247,19 @@ class TargetConfigurationTemplate2:
                                       "requires": all_requires,
                                       "cmake_target_aliases": cmake_target_aliases}
 
-    def _get_exes(self, cpp_info, pkg_name, pkg_folder, pkg_folder_var):
+    def _get_exes(self, cpp_info):
         exes = {}
 
         if cpp_info.has_components:
             for name, comp in cpp_info.components.items():
                 if comp.exe or comp.type is PackageType.APP:
                     target = self._cmake_info.get_cmake_target_name(comp_name=name)
-                    exe_location = self._path(comp.location, pkg_folder, pkg_folder_var)
+                    exe_location = self._cmake_path(comp.location)
                     exes[target] = exe_location
         else:
             if cpp_info.exe:
                 target = self._cmake_info.get_cmake_target_name()
-                exe_location = self._path(cpp_info.location, pkg_folder, pkg_folder_var)
+                exe_location = self._cmake_path(cpp_info.location)
                 exes[target] = exe_location
 
         return exes
@@ -293,11 +274,12 @@ class TargetConfigurationTemplate2:
         ret.update({extra_mod: "" for extra_mod in extra_mods})
         return ret
 
-    @staticmethod
-    def _path(p, pkg_folder, pkg_folder_var):
+    def _cmake_path(self, p):
         def escape(p_):
             return p_.replace("$", "\\$").replace('"', '\\"')
 
+        pkg_folder = self._cmake_info.package_folder
+        pkg_folder_var = self._cmake_info.package_folder_var
         p = p.replace("\\", "/")
         if os.path.isabs(p):
             if p.startswith(pkg_folder):

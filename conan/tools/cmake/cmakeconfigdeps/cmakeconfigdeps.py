@@ -10,7 +10,7 @@ from conan.errors import ConanException
 from conan.internal import check_duplicated_generator
 from conan.internal.api.install.generators import relativize_path
 from conan.internal.util.files import load
-from conan.tools.cmake.cmakeconfigdeps.cmake_config_info import CMakeFilesConfigInfo
+from conan.tools.cmake.cmakeconfigdeps.cmake_config_files import CMakeConfigFiles
 from conan.tools.files import save
 
 FIND_MODE_MODULE = "module"
@@ -112,9 +112,10 @@ class CMakeConfigDeps:
                                                          # Should this be risk?
                                                          warn_tag="deprecated")
 
+            cmake_config_files = CMakeConfigFiles(self, dep, require)
+            ret.update(cmake_config_files.items())
             if require.direct:
-                direct_deps.append((require, dep))
-            ret.update(CMakeFilesConfigInfo(self, dep, require).items())
+                direct_deps.append((require, dep, cmake_config_files.get_cmake_filename()))
 
         self._print_help(direct_deps)
         return ret
@@ -123,10 +124,10 @@ class CMakeConfigDeps:
         if direct_deps:
             msg = ["CMakeDeps necessary find_package() and targets for your CMakeLists.txt"]
             link_targets = []
-            for (require, dep) in direct_deps:
+            for (require, dep, cmake_file_name) in direct_deps:
                 note = " # Optional. This is a tool-require, can't link its targets" \
                     if require.build else ""
-                msg.append(f"    find_package({self.get_cmake_filename(dep)}){note}")
+                msg.append(f"    find_package({cmake_file_name}){note}")
                 if not require.build and not dep.cpp_info.exe:
                     target_name = self.get_property("cmake_target_name", dep)
                     link_targets.append(target_name or f"{dep.ref.name}::{dep.ref.name}")
