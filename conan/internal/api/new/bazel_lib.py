@@ -17,7 +17,7 @@ class {{package_name}}Recipe(ConanFile):
     default_options = {"shared": False, "fPIC": True}
 
     # Sources are located in the same place as this recipe, copy them to the recipe
-    exports_sources = "main/*", "WORKSPACE", ".bazelrc"
+    exports_sources = "main/*", "MODULE.bazel", ".bazelrc"
     generators = "BazelToolchain"
 
     def config_options(self):
@@ -32,10 +32,6 @@ class {{package_name}}Recipe(ConanFile):
         bazel_layout(self)
 
     def build(self):
-        from conan.api.output import ConanOutput
-        ConanOutput().warning("This is the template for Bazel 6.x version, "
-                              "but it will be overridden by the 'bazel_7_lib' template "
-                              "(Bazel >= 7.1 compatible).", warn_tag="deprecated")
         bazel = Bazel(self)
         # On Linux platforms, Bazel creates both shared and static libraries by default, and
         # it is getting naming conflicts if we use the cc_shared_library rule
@@ -84,7 +80,7 @@ class {{package_name}}TestConan(ConanFile):
 
     def build(self):
         bazel = Bazel(self)
-        bazel.build()
+        bazel.build(target="//main:example")
 
     def layout(self):
         bazel_layout(self)
@@ -97,6 +93,8 @@ class {{package_name}}TestConan(ConanFile):
 
 
 _bazel_build_test = """\
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+
 cc_binary(
     name = "example",
     srcs = ["example.cpp"],
@@ -107,14 +105,12 @@ cc_binary(
 """
 
 _bazel_build = """\
-cc_library(
-    name = "{{name}}",
-    srcs = ["{{name}}.cpp"],
-    hdrs = ["{{name}}.h"],
-)
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
 """
 
 _bazel_build_shared = """
+load("@rules_cc//cc:cc_shared_library.bzl", "cc_shared_library")
+
 cc_shared_library(
     name = "{{name}}_shared",
     shared_lib_name = "lib{{name}}_shared.%s",
@@ -122,20 +118,30 @@ cc_shared_library(
 )
 """
 
-_bazel_workspace = " "  # Important not empty, so template doesn't discard it
+_bazel_module_bazel = """\
+bazel_dep(name = "rules_cc", version = "0.2.14")
+"""
 _bazel_rc = """\
 {% if output_root_dir is defined %}startup --output_user_root={{output_root_dir}}{% endif %}
 """
-_test_bazel_workspace = """
-load("@//conan:dependencies.bzl", "load_conan_dependencies")
-load_conan_dependencies()
+_test_bazel_module_bazel = """\
+bazel_dep(name = "rules_cc", version = "0.2.14")
+
+load_conan_dependencies = use_extension("//conan:conan_deps_module_extension.bzl", "conan_extension")
+use_repo(load_conan_dependencies, "{{name}}")
 """
 
 
 def _get_bazel_build():
     import platform
     os_ = platform.system()
-    ret = _bazel_build
+    ret = _bazel_build + """\
+cc_library(
+    name = "{{name}}",
+    srcs = ["{{name}}.cpp"],
+    hdrs = ["{{name}}.h"],
+)
+"""
     if os_ != "Linux":
         ret += _bazel_build_shared % ("dylib" if os_ == "Darwin" else "dll")
     return ret
@@ -145,10 +151,10 @@ bazel_lib_files = {"conanfile.py": conanfile_sources_v2,
                    "main/{{name}}.cpp": source_cpp,
                    "main/{{name}}.h": source_h,
                    "main/BUILD": _get_bazel_build(),
-                   "WORKSPACE": _bazel_workspace,
+                   "MODULE.bazel": _bazel_module_bazel,
                    ".bazelrc": _bazel_rc,
                    "test_package/conanfile.py": test_conanfile_v2,
                    "test_package/main/example.cpp": test_main,
                    "test_package/main/BUILD": _bazel_build_test,
-                   "test_package/WORKSPACE": _test_bazel_workspace,
+                   "test_package/MODULE.bazel": _test_bazel_module_bazel,
                    "test_package/.bazelrc": _bazel_rc}

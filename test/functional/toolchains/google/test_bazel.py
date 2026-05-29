@@ -40,29 +40,10 @@ def base_profile():
 
 @pytest.mark.slow
 @pytest.mark.parametrize("build_type", ["Debug", "Release", "RelWithDebInfo", "MinSizeRel"])
-@pytest.mark.tool("bazel", "6.x")
-def test_basic_exe_6x(bazelrc, build_type, base_profile, bazel_output_root_dir):
-    client = TestClient(path_with_spaces=False)
-    client.run(f"new bazel_exe -d name=myapp -d version=1.0 -d output_root_dir={bazel_output_root_dir}")
-    # The build:<config> define several configurations that can be activated by passing
-    # the bazel config with tools.google.bazel:configs
-    client.save({"mybazelrc": bazelrc})
-    profile = base_profile.format(build_type=build_type,
-                                  curdir=client.current_folder.replace("\\", "/"))
-    client.save({"my_profile": profile})
-    client.run("create . --profile=./my_profile")
-    if build_type != "Debug":
-        assert "myapp/1.0: Hello World Release!" in client.out
-    else:
-        assert "myapp/1.0: Hello World Debug!" in client.out
-
-
-@pytest.mark.slow
-@pytest.mark.parametrize("build_type", ["Debug", "Release", "RelWithDebInfo", "MinSizeRel"])
 @pytest.mark.tool("bazel", "7.x")
 def test_basic_exe(bazelrc, build_type, base_profile, bazel_output_root_dir):
     client = TestClient(path_with_spaces=False)
-    client.run(f"new bazel_7_exe -d name=myapp -d version=1.0 -d output_root_dir={bazel_output_root_dir}")
+    client.run(f"new bazel_exe -d name=myapp -d version=1.0 -d output_root_dir={bazel_output_root_dir}")
     # The build:<config> define several configurations that can be activated by passing
     # the bazel config with tools.google.bazel:configs
     client.save({"mybazelrc": bazelrc})
@@ -83,135 +64,26 @@ def test_basic_lib(bazelrc, base_profile, bazel_output_root_dir):
     Issue related: https://github.com/conan-io/conan/issues/17438
     """
     client = TestClient(path_with_spaces=False)
-    client.run(f"new bazel_7_lib -d name=mylib -d version=1.0 -d output_root_dir={bazel_output_root_dir}")
+    client.run(f"new bazel_lib -d name=mylib -d version=1.0 -d output_root_dir={bazel_output_root_dir}")
     client.run("create .")
     assert "mylib/1.0: Hello World Release!" in client.out
 
+
 @pytest.mark.slow
-@pytest.mark.parametrize("shared", [False, True])
-@pytest.mark.tool("bazel", "6.x")
-def test_transitive_libs_consuming_6x(shared, bazel_output_root_dir):
-    """
-    Testing the next dependencies structure for shared/static libs
-
-    /.
-    |- myfirstlib/
-         |- conanfile.py
-         |- WORKSPACE
-         |- main/
-            |- BUILD
-            |- myfirstlib.cpp
-            |- myfirstlib.h
-    |- mysecondlib/  (requires myfirstlib)
-         |- conanfile.py
-         |- WORKSPACE
-         |- main/
-            |- BUILD
-            |- mysecondlib.cpp
-            |- mysecondlib.h
-         |- test_package/
-            |- WORKSPACE
-            |- conanfile.py
-            |- main
-                |- example.cpp
-                |- BUILD
-    """
+@pytest.mark.parametrize("build_type", ["Debug", "Release", "RelWithDebInfo", "MinSizeRel"])
+@pytest.mark.tool("bazel", "9.x")
+def test_basic_exe_9x(bazelrc, build_type, base_profile, bazel_output_root_dir):
     client = TestClient(path_with_spaces=False)
-    # A regular library made with Bazel
-    with client.chdir("myfirstlib"):
-        client.run(f"new bazel_lib -d name=myfirstlib -d version=1.2.11 -d output_root_dir={bazel_output_root_dir}")
-        conanfile = client.load("conanfile.py")
-        conanfile += """
-        self.cpp_info.defines.append("MY_DEFINE=\\"MY_VALUE\\"")
-        self.cpp_info.defines.append("MY_OTHER_DEFINE=2")
-        if self.settings.os != "Windows":
-            self.cpp_info.system_libs.append("m")
-        else:
-            self.cpp_info.system_libs.append("ws2_32")
-        """
-        client.save({"conanfile.py": conanfile})
-        client.run(f"create . -o '*:shared={shared}' -tf ''")  # skipping tests
-
-    with client.chdir("mysecondlib"):
-        # We prepare a consumer with Bazel (library mysecondlib using myfirstlib)
-        # and a test_package with an example executable
-        os_ = platform.system()
-        client.run(f"new bazel_lib -d name=mysecondlib -d version=1.0 -d output_root_dir={bazel_output_root_dir}")
-        conanfile = client.load("conanfile.py")
-        conanfile = conanfile.replace('generators = "BazelToolchain"',
-                                      'generators = "BazelToolchain", "BazelDeps"\n'
-                                      '    requires = "myfirstlib/1.2.11"')
-        workspace = textwrap.dedent("""
-        load("@//conan:dependencies.bzl", "load_conan_dependencies")
-        load_conan_dependencies()
-        """)
-        bazel_build_linux = textwrap.dedent("""\
-        cc_library(
-            name = "mysecondlib",
-            srcs = ["mysecondlib.cpp"],
-            hdrs = ["mysecondlib.h"],
-            deps = [ "@myfirstlib//:myfirstlib" ]
-        )
-        """)
-        bazel_build = textwrap.dedent("""\
-        cc_library(
-            name = "mysecondlib",
-            srcs = ["mysecondlib.cpp"],
-            hdrs = ["mysecondlib.h"],
-            deps = [ "@myfirstlib//:myfirstlib" ]
-        )
-
-        cc_shared_library(
-            name = "mysecondlib_shared",
-            shared_lib_name = "libmysecondlib_shared.{}",
-            deps = [":mysecondlib"],
-        )
-        """.format("dylib" if os_ == "Darwin" else "dll"))
-        mysecondlib_cpp = textwrap.dedent("""
-        #include <iostream>
-        #include "mysecondlib.h"
-        #include "myfirstlib.h"
-        #include <cmath>
-
-        void mysecondlib(){
-            std::cout << "mysecondlib() First define " << MY_DEFINE << " and other define " << MY_OTHER_DEFINE << std::endl;
-            myfirstlib();
-            // This comes from the systemlibs declared in the myfirstlib
-            sqrt(25);
-        }
-        void mysecondlib_print_vector(const std::vector<std::string> &strings) {
-            for(std::vector<std::string>::const_iterator it = strings.begin(); it != strings.end(); ++it) {
-                std::cout << "mysecondlib/1.0 " << *it << std::endl;
-            }
-        }
-        """)
-        mysecondlib_cpp_win = textwrap.dedent("""
-        #include <iostream>
-        #include "mysecondlib.h"
-        #include "myfirstlib.h"
-        #include <WinSock2.h>
-
-        void mysecondlib(){
-            SOCKET foo; // From the system library
-            std::cout << "mysecondlib() First define " << MY_DEFINE << " and other define " << MY_OTHER_DEFINE << std::endl;
-            myfirstlib();
-        }
-        void mysecondlib_print_vector(const std::vector<std::string> &strings) {
-            for(std::vector<std::string>::const_iterator it = strings.begin(); it != strings.end(); ++it) {
-                std::cout << "mysecondlib/1.0 " << *it << std::endl;
-            }
-        }
-        """)
-        # Overwriting files
-        client.save({"conanfile.py": conanfile,
-                     "WORKSPACE": workspace,
-                     "main/BUILD": bazel_build_linux if os_ == "Linux" else bazel_build,
-                     "main/mysecondlib.cpp": mysecondlib_cpp if os_ != "Windows" else mysecondlib_cpp_win,
-                     })
-
-        client.run(f"create . -o '*:shared={shared}'")
-        assert "mysecondlib() First define MY_VALUE and other define 2" in client.out
-        assert "myfirstlib/1.2.11: Hello World Release!"
+    client.run(f"new bazel_exe -d name=myapp -d version=1.0 -d output_root_dir={bazel_output_root_dir}")
+    client.save({"mybazelrc": bazelrc})
+    profile = base_profile.format(build_type=build_type,
+                                  curdir=client.current_folder.replace("\\", "/"))
+    client.save({"my_profile": profile})
+    client.run("create . --profile=./my_profile")
+    if build_type != "Debug":
+        assert "myapp/1.0: Hello World Release!" in client.out
+    else:
+        assert "myapp/1.0: Hello World Debug!" in client.out
 
 
 @pytest.mark.slow
@@ -249,7 +121,7 @@ def test_transitive_libs_consuming_7x(shared, bazel_output_root_dir):
     client = TestClient(path_with_spaces=False)
     # A regular library made with Bazel
     with client.chdir("myfirstlib"):
-        client.run(f"new bazel_7_lib -d name=myfirstlib -d version=1.2.11 -d output_root_dir={bazel_output_root_dir}")
+        client.run(f"new bazel_lib -d name=myfirstlib -d version=1.2.11 -d output_root_dir={bazel_output_root_dir}")
         conanfile = client.load("conanfile.py")
         conanfile += """
         self.cpp_info.defines.append("MY_DEFINE=\\"MY_VALUE\\"")
@@ -270,16 +142,20 @@ def test_transitive_libs_consuming_7x(shared, bazel_output_root_dir):
         # We prepare a consumer with Bazel (library mysecondlib using myfirstlib)
         # and a test_package with an example executable
         os_ = platform.system()
-        client.run(f"new bazel_7_lib -d name=mysecondlib -d version=1.0 -d output_root_dir={bazel_output_root_dir}")
+        client.run(f"new bazel_lib -d name=mysecondlib -d version=1.0 -d output_root_dir={bazel_output_root_dir}")
         conanfile = client.load("conanfile.py")
         conanfile = conanfile.replace('generators = "BazelToolchain"',
                                       'generators = "BazelToolchain", "BazelDeps"\n'
                                       '    requires = "myfirstlib/1.2.11"')
         workspace = textwrap.dedent("""
+        bazel_dep(name = "rules_cc", version = "0.2.14")
+
         load_conan_dependencies = use_extension("//conan:conan_deps_module_extension.bzl", "conan_extension")
         use_repo(load_conan_dependencies, "myfirstlib")
         """)
         bazel_build_linux = textwrap.dedent("""\
+        load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
         cc_library(
             name = "mysecondlib",
             srcs = ["mysecondlib.cpp"],
@@ -288,6 +164,9 @@ def test_transitive_libs_consuming_7x(shared, bazel_output_root_dir):
         )
         """)
         bazel_build = textwrap.dedent("""\
+        load("@rules_cc//cc:cc_library.bzl", "cc_library")
+        load("@rules_cc//cc:cc_shared_library.bzl", "cc_shared_library")
+
         cc_library(
             name = "mysecondlib",
             srcs = ["mysecondlib.cpp"],
@@ -357,6 +236,19 @@ def test_empty_bazel_query():
 
     Issue related: https://github.com/conan-io/conan/issues/18743
     """
+    _run_empty_bazel_query_test()
+
+
+@pytest.mark.slow
+@pytest.mark.tool("bazel", "9.x")
+def test_empty_bazel_query_9x():
+    """
+    Test BazelDeps with Bazel 9.x (rules_cc loads required in generated BUILD files).
+    """
+    _run_empty_bazel_query_test()
+
+
+def _run_empty_bazel_query_test():
     zlib = GenConanfile("zlib", "0.1")
     consumer = textwrap.dedent("""
     from conan import ConanFile
@@ -374,6 +266,8 @@ def test_empty_bazel_query():
             bz.generate()
     """)
     module = textwrap.dedent("""\
+    bazel_dep(name = "rules_cc", version = "0.2.14")
+
     load_conan_dependencies = use_extension("//conan:conan_deps_module_extension.bzl", "conan_extension")
     use_repo(load_conan_dependencies, "zlib")
     """)

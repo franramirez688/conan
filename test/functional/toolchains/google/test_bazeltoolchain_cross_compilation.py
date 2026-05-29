@@ -11,7 +11,7 @@ from conan.test.utils.tools import TestClient
 
 @pytest.mark.slow
 @pytest.mark.skipif(platform.system() != "Darwin", reason="Only for Darwin")
-@pytest.mark.tool("bazel", "6.x")  # not working for Bazel 7.x
+@pytest.mark.tool("bazel", "7.x")
 def test_bazel_simple_cross_compilation():
     profile = textwrap.dedent("""
     [settings]
@@ -55,6 +55,8 @@ def test_bazel_simple_cross_compilation():
             bazel.build()
     """)
     BUILD = textwrap.dedent("""
+    load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
     cc_library(
         name = "myapp",
         srcs = ["myapp.cpp"],
@@ -67,7 +69,7 @@ def test_bazel_simple_cross_compilation():
         "profile": profile,
         "profile_host": profile_host,
         "conanfile.py": conanfile,
-        "WORKSPACE": "",
+        "MODULE.bazel": 'bazel_dep(name = "rules_cc", version = "0.2.14")\n',
         ".bazelrc": f"startup --output_user_root={bazel_root_dir}",
         "main/BUILD": BUILD,
         "main/myapp.cpp": gen_function_cpp(name="myapp"),

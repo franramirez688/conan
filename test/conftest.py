@@ -158,15 +158,15 @@ tools_locations = {
     },
     'bazel': {
         "default": "7.x",
-        "6.x": {"path": {'Linux': '/usr/share/bazel-6.5.0/bin',
-                         'Windows': 'C:/tools/bazel/6.5.0',
-                         'Darwin': '/Users/runner/Applications/bazel/6.5.0'}},
         "7.x": {"path": {'Linux': '/usr/share/bazel-7.6.2/bin',
                          'Windows': 'C:/tools/bazel/7.6.2',
                          'Darwin': '/Users/runner/Applications/bazel/7.6.2'}},
         "8.x": {"path": {'Linux': '/usr/share/bazel-8.4.2/bin',
                          'Windows': 'C:/tools/bazel/8.4.2',
                          'Darwin': '/Users/runner/Applications/bazel/8.4.2'}},
+        "9.x": {"path": {'Linux': '/usr/share/bazel-9.1.0/bin',
+                         'Windows': 'C:/tools/bazel/9.1.0',
+                         'Darwin': '/Users/runner/Applications/bazel/9.1.0'}},
     },
     'premake': {
         "exe": "premake5",
