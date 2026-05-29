@@ -32,12 +32,6 @@ def _relativize_path(path, start_folder):
     return path
 
 
-_RULES_CC_LOADS = textwrap.dedent("""\
-load("@rules_cc//cc:cc_import.bzl", "cc_import")
-load("@rules_cc//cc:cc_library.bzl", "cc_library")
-""")
-
-
 class _BazelDepBuildGenerator:
     """
     This class creates the BUILD.bazel for each dependency where it's declared all the
@@ -46,7 +40,9 @@ class _BazelDepBuildGenerator:
     # If both files exist, BUILD.bazel takes precedence over BUILD
     # https://bazel.build/concepts/build-files
     dep_build_filename = "BUILD.bazel"
-    dep_build_template = _RULES_CC_LOADS + textwrap.dedent("""\
+    dep_build_template = textwrap.dedent("""\
+    load("@rules_cc//cc:cc_import.bzl", "cc_import")
+    load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
     {% macro cc_import_macro(libs) %}
     {% for lib_info in libs %}

@@ -10,12 +10,6 @@ from conan.test.assets.genconanfile import GenConanfile
 from conan.test.utils.tools import TestClient
 from conan.tools.files import load
 
-RULES_CC_LOADS = textwrap.dedent("""\
-load("@rules_cc//cc:cc_import.bzl", "cc_import")
-load("@rules_cc//cc:cc_library.bzl", "cc_library")
-
-""")
-
 
 def test_bazel():
     # https://github.com/conan-io/conan/issues/10471
@@ -64,7 +58,10 @@ def test_bazel_relative_paths():
     c.run("install consumer")
     assert "conanfile.py: Generator 'BazelToolchain' calling 'generate()'" in c.out
     build_file = c.load("consumer/conandeps/dep/BUILD.bazel")
-    expected = RULES_CC_LOADS + textwrap.dedent("""\
+    expected = textwrap.dedent("""\
+    load("@rules_cc//cc:cc_import.bzl", "cc_import")
+    load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
     # Components precompiled libs
     # Root package precompiled libs
 
@@ -163,7 +160,10 @@ def test_bazeldeps_and_tool_requires():
     c.run("export dep")
     c.run("install --requires=dep/0.1 -g BazelDeps --build=missing")
     build_file = c.load("dep/BUILD.bazel")
-    expected = RULES_CC_LOADS + textwrap.dedent("""\
+    expected = textwrap.dedent("""\
+    load("@rules_cc//cc:cc_import.bzl", "cc_import")
+    load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
     # Components precompiled libs
     # Root package precompiled libs
     cc_import(
@@ -279,7 +279,10 @@ def test_pkg_with_public_deps_and_component_requires():
     client2.save({"conanfile.txt": conanfile})
     client2.run("install .")
     content = client2.load("third/BUILD.bazel")
-    assert RULES_CC_LOADS + textwrap.dedent("""\
+    assert textwrap.dedent("""\
+    load("@rules_cc//cc:cc_import.bzl", "cc_import")
+    load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
     cc_library(
         name = "third",
         hdrs = glob([
@@ -298,7 +301,10 @@ def test_pkg_with_public_deps_and_component_requires():
         ],
     )""") in content
     content = client2.load("second/BUILD.bazel")
-    assert RULES_CC_LOADS + textwrap.dedent("""\
+    assert textwrap.dedent("""\
+    load("@rules_cc//cc:cc_import.bzl", "cc_import")
+    load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
     # Components libraries declaration
     cc_library(
         name = "second-mycomponent",
@@ -354,7 +360,10 @@ def test_pkg_with_public_deps_and_component_requires():
         ],
     )""") in content
     content = client2.load("first/BUILD.bazel")
-    assert RULES_CC_LOADS + textwrap.dedent("""\
+    assert textwrap.dedent("""\
+    load("@rules_cc//cc:cc_import.bzl", "cc_import")
+    load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
     # Components precompiled libs
     cc_import(
         name = "libcmp1_precompiled",
@@ -468,7 +477,10 @@ def test_pkg_with_public_deps_and_component_requires_2():
     client2.save({"conanfile.txt": conanfile})
     client2.run("install .")
     content = client2.load("pkg/BUILD.bazel")
-    assert RULES_CC_LOADS + textwrap.dedent("""\
+    assert textwrap.dedent("""\
+    load("@rules_cc//cc:cc_import.bzl", "cc_import")
+    load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
     # Package library declaration
     cc_library(
         name = "pkg",
@@ -487,7 +499,10 @@ def test_pkg_with_public_deps_and_component_requires_2():
         ],
     )""") in content
     content = client2.load("other/BUILD.bazel")
-    assert RULES_CC_LOADS + textwrap.dedent("""\
+    assert textwrap.dedent("""\
+    load("@rules_cc//cc:cc_import.bzl", "cc_import")
+    load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
     # Components precompiled libs
     cc_import(
         name = "other_cmp1_precompiled",
@@ -611,7 +626,10 @@ def test_pkgconfigdeps_with_test_requires():
         """)
     client.save({"conanfile.py": conanfile}, clean_first=True)
     client.run("install . -g BazelDeps")
-    expected = RULES_CC_LOADS + textwrap.dedent("""\
+    expected = textwrap.dedent("""\
+    load("@rules_cc//cc:cc_import.bzl", "cc_import")
+    load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
     # Root package precompiled libs
     cc_import(
         name = "lib{0}_precompiled",
@@ -680,7 +698,10 @@ def test_with_editable_layout():
             )""") in content
         content = client.load("dep/BUILD.bazel")
         assert pathlib.Path(client.current_folder, "conan_deps_repo_rules.bzl").exists()
-        assert RULES_CC_LOADS + textwrap.dedent("""\
+        assert textwrap.dedent("""\
+        load("@rules_cc//cc:cc_import.bzl", "cc_import")
+        load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
         # Components precompiled libs
         # Root package precompiled libs
         cc_import(
@@ -774,7 +795,10 @@ def test_tool_requires():
     client.save({"conanfile.py": conanfile}, clean_first=True)
     client.run("install . -pr:h default -pr:b default")
     assert 'name = "tool"' in client.load("build-tool/BUILD.bazel")
-    assert RULES_CC_LOADS + textwrap.dedent("""\
+    assert textwrap.dedent("""\
+    load("@rules_cc//cc:cc_import.bzl", "cc_import")
+    load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
     # Components precompiled libs
     cc_import(
         name = "other_cmp1_precompiled",
@@ -1200,7 +1224,10 @@ def test_shared_windows_find_libraries():
     zlib_bazel_build = load(None, os.path.join(c.current_folder, "zlib", "BUILD.bazel"))
     openssl_bazel_build = load(None, os.path.join(c.current_folder, "openssl", "BUILD.bazel"))
     libiconv_bazel_build = load(None, os.path.join(c.current_folder, "libiconv", "BUILD.bazel"))
-    libcurl_expected = RULES_CC_LOADS + textwrap.dedent("""\
+    libcurl_expected = textwrap.dedent("""\
+    load("@rules_cc//cc:cc_import.bzl", "cc_import")
+    load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
     # Components precompiled libs
     cc_import(
         name = "libcurl_imp_precompiled",
@@ -1208,7 +1235,10 @@ def test_shared_windows_find_libraries():
         interface_library = "lib/libcurl_imp.lib",
     )
     """)
-    openssl_expected = RULES_CC_LOADS + textwrap.dedent("""\
+    openssl_expected = textwrap.dedent("""\
+    load("@rules_cc//cc:cc_import.bzl", "cc_import")
+    load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
     # Components precompiled libs
     cc_import(
         name = "libcrypto_precompiled",
@@ -1222,21 +1252,30 @@ def test_shared_windows_find_libraries():
         interface_library = "lib/libssl.lib",
     )
     """)
-    zlib_expected = RULES_CC_LOADS + textwrap.dedent("""\
+    zlib_expected = textwrap.dedent("""\
+    load("@rules_cc//cc:cc_import.bzl", "cc_import")
+    load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
     cc_import(
         name = "zdll_precompiled",
         shared_library = "bin/zlib1.dll",
         interface_library = "lib/zdll.lib",
     )
     """)
-    iconv_expected = RULES_CC_LOADS + textwrap.dedent("""\
+    iconv_expected = textwrap.dedent("""\
+    load("@rules_cc//cc:cc_import.bzl", "cc_import")
+    load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
     cc_import(
         name = "iconv_precompiled",
         shared_library = "bin/iconv-2.dll",
         interface_library = "lib/iconv.lib",
     )
     """)
-    charset_expected = RULES_CC_LOADS + textwrap.dedent("""\
+    charset_expected = textwrap.dedent("""\
+    load("@rules_cc//cc:cc_import.bzl", "cc_import")
+    load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
     cc_import(
         name = "charset_precompiled",
         shared_library = "bin/charset-1.dll",
@@ -1272,7 +1311,10 @@ def test_pkg_with_duplicated_component_requires():
                 clean_first=True)
     client.run("install . -g BazelDeps")
     build_content = load(None, os.path.join(client.current_folder, "mylib", "BUILD.bazel"))
-    myfirstcomp_expected = RULES_CC_LOADS + textwrap.dedent("""\
+    myfirstcomp_expected = textwrap.dedent("""\
+    load("@rules_cc//cc:cc_import.bzl", "cc_import")
+    load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
     cc_library(
         name = "mylib-myfirstcomp",
         hdrs = glob([
@@ -1315,7 +1357,10 @@ def test_apple_frameworks_and_frameworkdirs():
                 clean_first=True)
     client.run("install . -g BazelDeps")
     build_content = load(None, os.path.join(client.current_folder, "mylib", "BUILD.bazel"))
-    build_file_expected = RULES_CC_LOADS + textwrap.dedent("""\
+    build_file_expected = textwrap.dedent("""\
+    load("@rules_cc//cc:cc_import.bzl", "cc_import")
+    load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
     cc_library(
         name = "mylib",
         hdrs = glob([
